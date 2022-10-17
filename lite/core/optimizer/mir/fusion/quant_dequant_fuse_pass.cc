@@ -69,6 +69,10 @@ void QuantDequantFusePass::Apply(const std::unique_ptr<SSAGraph>& graph) {
     dq_fuser(graph.get());
   }
 
+#ifdef LITE_WITH_XPU
+  GetInputThreshold(graph);
+#endif
+
   // process new quant op pass: quantize_linear and dequantize_linear
   // pass1: input+quantize_linear+dequantize_linear --> input
   fusion::QuantDequantLinearOpFuser quant_dequant_linear_fuser;
