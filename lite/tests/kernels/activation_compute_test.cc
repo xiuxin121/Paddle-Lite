@@ -590,7 +590,6 @@ TEST(Activation_relu_clipped, precision) {
 }
 
 TEST(Activation_prelu, precision) {
-  LOG(INFO) << "test prelu op";
   Place place;
   float abs_error = 2e-5;
   std::vector<std::string> modes{"all", "channel", "element"};
@@ -600,6 +599,9 @@ TEST(Activation_prelu, precision) {
   abs_error = 1e-2;
   modes = {"all", "channel"};
 #elif defined(NNADAPTER_WITH_HUAWEI_KIRIN_NPU)
+  abs_error = 1e-2;
+  modes = {"all", "channel"};
+#elif defined(NNADAPTER_WITH_QUALCOMM_QNN)
   abs_error = 1e-2;
   modes = {"all", "channel"};
 #else
@@ -880,6 +882,8 @@ TEST(Activation_log, precision) {
       dims.push_back(1);
     }
   }
+#elif defined(NNADAPTER_WITH_QUALCOMM_QNN)
+  abs_error = 1e-2;
 #else
   return;
 #endif
@@ -929,6 +933,8 @@ TEST(Activation_exp, precision) {
   }
 #elif defined(NNADAPTER_WITH_CAMBRICON_MLU)
   abs_error = 1e-3;
+#elif defined(NNADAPTER_WITH_QUALCOMM_QNN)
+  abs_error = 1e-3;
 #else
   return;
 #endif
@@ -961,6 +967,8 @@ TEST(Activation_floor, precision) {
   abs_error = 1e-2;
 #elif defined(NNADAPTER_WITH_HUAWEI_KIRIN_NPU)
   abs_error = 5e-2;
+#elif defined(NNADAPTER_WITH_QUALCOMM_QNN)
+  abs_error = 1e-2;
 #else
   return;
 #endif
@@ -1179,6 +1187,10 @@ TEST(Activation_softplus, precision) {
   abs_error = 5e-2;
 #elif defined(NNADAPTER_WITH_INTEL_OPENVINO)
   abs_error = 1e-5;
+#elif defined(NNADAPTER_WITH_QUALCOMM_QNN)
+  abs_error = 1e-2;
+  // Not support htp
+  return;
 #else
   return;
 #endif
