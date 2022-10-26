@@ -208,43 +208,43 @@ void MulticlassNmsCompute::Run() {
 }  // namespace lite
 }  // namespace paddle
 
-REGISTER_LITE_KERNEL(multiclass_nms,
-                     kXPU,
-                     kFloat,
-                     kNCHW,
-                     paddle::lite::kernels::xpu::MulticlassNmsCompute,
-                     def)
-    .BindInput("BBoxes", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kHost))})
-    .Finalize();
+// REGISTER_LITE_KERNEL(multiclass_nms,
+//                      kXPU,
+//                      kFloat,
+//                      kNCHW,
+//                      paddle::lite::kernels::xpu::MulticlassNmsCompute,
+//                      def)
+//     .BindInput("BBoxes", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kHost))})
+//     .Finalize();
 
-REGISTER_LITE_KERNEL(multiclass_nms2,
-                     kXPU,
-                     kFloat,
-                     kNCHW,
-                     paddle::lite::kernels::xpu::MulticlassNmsCompute,
-                     def)
-    .BindInput("BBoxes", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kHost))})
-    .BindOutput("Index",
-                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
-    .Finalize();
+// REGISTER_LITE_KERNEL(multiclass_nms2,
+//                      kXPU,
+//                      kFloat,
+//                      kNCHW,
+//                      paddle::lite::kernels::xpu::MulticlassNmsCompute,
+//                      def)
+//     .BindInput("BBoxes", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kHost))})
+//     .BindOutput("Index",
+//                 {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
+//     .Finalize();
 
-REGISTER_LITE_KERNEL(multiclass_nms3,
-                     kXPU,
-                     kFloat,
-                     kNCHW,
-                     paddle::lite::kernels::xpu::MulticlassNmsCompute,
-                     DISABLE_XPU2_MulticlassNms3)
-    .BindInput("BBoxes", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("RoisNum",
-               {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kHost))})
-    .BindOutput("Index",
-                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
-    .BindOutput("NmsRoisNum",
-                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
-    .Finalize();
+// REGISTER_LITE_KERNEL(multiclass_nms3,
+//                      kXPU,
+//                      kFloat,
+//                      kNCHW,
+//                      paddle::lite::kernels::xpu::MulticlassNmsCompute,
+//                      DISABLE_XPU2_MulticlassNms3)
+//     .BindInput("BBoxes", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("RoisNum",
+//                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
+//     .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kHost))})
+//     .BindOutput("Index",
+//                 {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
+//     .BindOutput("NmsRoisNum",
+//                 {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
+//     .Finalize();

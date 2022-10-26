@@ -389,11 +389,11 @@ REGISTER_LITE_KERNEL(
     .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU))})
     .Finalize();
 
-REGISTER_LITE_KERNEL(
-    pow, kXPU, kFloat, kNCHW, paddle::lite::kernels::xpu::PowCompute, def)
-    .BindInput("X", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .Finalize();
+// REGISTER_LITE_KERNEL(
+//     pow, kXPU, kFloat, kNCHW, paddle::lite::kernels::xpu::PowCompute, def)
+//     .BindInput("X", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .Finalize();
 
 REGISTER_LITE_KERNEL(
     log, kXPU, kFloat, kNCHW, paddle::lite::kernels::xpu::LogCompute, def)

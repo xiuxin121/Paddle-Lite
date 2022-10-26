@@ -640,6 +640,12 @@ void RuntimeProgram::Run() {
     inst.Flush(idx);
 #endif
 
+    auto names = inst.op()->op_info()->output_names();
+    for (auto name : names) {
+      VLOG(6) << "output name:" << name;
+    }
+    VLOG(6) << " kernel name:" << inst.kernel()->op_type();
+
     inst.Run();
 
 #ifdef LITE_WITH_FPGA
@@ -765,8 +771,10 @@ void Program::PrepareWorkspace(
                 TARGET(kUnk), var_data_type, DATALAYOUT(kUnk));
           }
           VLOG(4) << " - data type " << static_cast<int>(var_data_type);
-          // Create the tensor with the shape from var desc, it's convenient to
-          // the graph analysis in the passes, but you should resize the tensor
+          // Create the tensor with the shape from var desc, it's convenient
+          // to
+          // the graph analysis in the passes, but you should resize the
+          // tensor
           // with the real shape before accessing its data, because the
           // var_shape may be [-1,3,224,224]
           const auto& var_shape = var_desc->GetShape();

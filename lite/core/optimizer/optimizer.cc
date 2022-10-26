@@ -140,147 +140,147 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
     const lite_api::CxxConfig& config) {
   Optimizer optim(valid_places, kernel_pick_factor);
 
-  std::vector<std::string> passes_local{
-      {"lite_quant_dequant_fuse_pass",
-       "weight_quantization_preprocess_pass",
-       "op_transformation_pass",
-       "assign_value_calc_offline_pass",
-       "p_norm_fill_constant_max_div_fuse_pass",
-       "fill_constant_calc_offline_pass",
-       "range_calc_offline_pass",
-       "scale_calc_offline_pass",
-       "unsqueeze_calc_offline_pass",
-       "reshape_calc_offline_pass",
-       "ssd_boxes_calc_offline_pass",
-       // A minimal set of op fusion pass.
-       "op_fusion_minimal_set_pass",
-       // For the fully quantization model, the quantization parameters of the
-       // quantized ops are inferred by the propagation method according to the
-       // input scales and out_threashold.
-       "quantization_parameters_propagation_pass",
-       // Based on the custom mixed precision configuration information, remove
-       // the quantization parameters of some quantized ops to force them to run
-       // at fp32 precision.
-       "quantization_parameters_removal_pass",
-       // Subgraph partition based on operator support information defined in
-       // lite/kernels/nnadapter/converter/all.h
-       "nnadapter_subgraph_pass",
-       // Please notify @hong19860320 and @zhupengyang for code review if you
-       // want to insert a pass in the above passes.
-       "remove_scale1_pass",
-       "adaptive_1x1_pool2d_convert_global_pass",  //
-       "lite_unsqueeze2_pad3d_squeeze2_fuse_pass",
-       "lite_conv_elementwise_fuse_pass",  // conv-elemwise-bn
-       "lite_conv_bn_fuse_pass",           //
-       "lite_conv_elementwise_fuse_pass",  // conv-bn-elemwise
-       "lite_conv_conv_fuse_pass",         //
-       // TODO(Superjomn) Refine the fusion related design to select fusion
-       // kernels for devices automatically.
-       "lite_conv_activation_fuse_pass",              //
-       "lite_var_conv_2d_activation_fuse_pass",       //
-       "lite_match_matrix_activation_fuse_pass",      //
-       "lite_squeeze2_matmul_fuse_pass",              //
-       "lite_reshape2_matmul_fuse_pass",              //
-       "lite_matmul_element_add_fuse_pass",           //
-       "lite_matmul_fuse_pass",                       //
-       "lite_fc_fuse_pass",                           //
-       "lite_shuffle_channel_fuse_pass",              //
-       "lite_transpose_softmax_transpose_fuse_pass",  //
-       "lite_interpolate_fuse_pass",                  //
-       "identity_scale_eliminate_pass",               //
-       "lite_scales_fuse_pass",                       //
-       "lite_sequence_reverse_embedding_fuse_pass",   //
-       "elementwise_mul_constant_eliminate_pass",     //
-       "lite_sequence_pool_concat_fuse_pass",         //
-       "lite_scale_activation_fuse_pass",             //
-       "lite_scaleacts_fuse_pass",                    //
-       "lite_elementwise_scale_fuse_pass",            //
-       "lite_instance_norm_activation_fuse_pass",     //
-       "lite_flatten_fc_fuse_pass",                   //
-       "lite_fc_prelu_fuse_pass",                     //
-       "lite_elementwise_activation_fuse_pass",
-       "lite_conv_scale_fuse_pass",
-       "lite_conv_elementwise_tree_fuse_pass",
-       "lite_greater_than_cast_fuse_pass",
-       "fill_range_fuse_pass",
-       "identity_dropout_eliminate_pass",
-       "sparse_conv_detect_pass",
-       "keepdims_convert_pass",
-       "__xpu__max_pooling_pad_zero_detect_fuse_pass",
-       "__xpu__graph_dedup_pass",
-       "__xpu__resnet_fuse_pass",
-       "__xpu__conv2d_affine_channel_fuse_pass",
-       "__xpu__conv2d_fuse_pass",
-       "__xpu__squeeze_excitation_fuse_pass",
-       "__xpu__mmdnn_fuse_pass",
-       "__xpu__bigru_fuse_pass",
-       "__xpu__multi_encoder_fuse_pass",
-       "__xpu__embedding_with_eltwise_add_fuse_pass",
-       "__xpu__fc_fuse_pass",
-       "__xpu__softmax_topk_fuse_pass",
-       "__xpu__multi_encoder_adaptive_seqlen_fuse_pass",
-       "__xpu__multi_encoder_slice_link_fuse_pass",
-       "__xpu__generate_sequence_fuse_pass",
-       "__xpu__logit_fuse_pass",
-       "__xpu__link_previous_out_max_pass",
-       "fix_mismatched_precision_pass",
-       "__xpu__dynamic_lstm_fuse_pass",
-       "__xpu__multi_softmax_fuse_pass",
-       "npu_subgraph_pass",
-       "bm_subgraph_pass",
-       "fpga_concat_fuse_pass",
-       "control_flow_op_unused_inputs_and_outputs_eliminate_pass",
-       "static_kernel_pick_pass",  // pick original kernel from graph
+  std::vector<std::string> passes_local{{
+      "lite_quant_dequant_fuse_pass",
+      "weight_quantization_preprocess_pass",
+      "op_transformation_pass",
+      "assign_value_calc_offline_pass",
+      "p_norm_fill_constant_max_div_fuse_pass",
+      "fill_constant_calc_offline_pass",
+      "range_calc_offline_pass",
+      "scale_calc_offline_pass",
+      "unsqueeze_calc_offline_pass",
+      "reshape_calc_offline_pass",
+      "ssd_boxes_calc_offline_pass",
+      // A minimal set of op fusion pass.
+      "op_fusion_minimal_set_pass",
+      // For the fully quantization model, the quantization parameters of the
+      // quantized ops are inferred by the propagation method according to the
+      // input scales and out_threashold.
+      "quantization_parameters_propagation_pass",
+      // Based on the custom mixed precision configuration information, remove
+      // the quantization parameters of some quantized ops to force them to run
+      // at fp32 precision.
+      "quantization_parameters_removal_pass",
+      // Subgraph partition based on operator support information defined in
+      // lite/kernels/nnadapter/converter/all.h
+      "nnadapter_subgraph_pass",
+      // Please notify @hong19860320 and @zhupengyang for code review if you
+      // want to insert a pass in the above passes.
+      "remove_scale1_pass",
+      "adaptive_1x1_pool2d_convert_global_pass",  //
+      "lite_unsqueeze2_pad3d_squeeze2_fuse_pass",
+      "lite_conv_elementwise_fuse_pass",  // conv-elemwise-bn
+      "lite_conv_bn_fuse_pass",           //
+      "lite_conv_elementwise_fuse_pass",  // conv-bn-elemwise
+      "lite_conv_conv_fuse_pass",         //
+      // TODO(Superjomn) Refine the fusion related design to select fusion
+      // kernels for devices automatically.
+      "lite_conv_activation_fuse_pass",              //
+      "lite_var_conv_2d_activation_fuse_pass",       //
+      "lite_match_matrix_activation_fuse_pass",      //
+      "lite_squeeze2_matmul_fuse_pass",              //
+      "lite_reshape2_matmul_fuse_pass",              //
+      "lite_matmul_element_add_fuse_pass",           //
+      "lite_matmul_fuse_pass",                       //
+      "lite_fc_fuse_pass",                           //
+      "lite_shuffle_channel_fuse_pass",              //
+      "lite_transpose_softmax_transpose_fuse_pass",  //
+      "lite_interpolate_fuse_pass",                  //
+      "identity_scale_eliminate_pass",               //
+      "lite_scales_fuse_pass",                       //
+      "lite_sequence_reverse_embedding_fuse_pass",   //
+      "elementwise_mul_constant_eliminate_pass",     //
+      "lite_sequence_pool_concat_fuse_pass",         //
+      "lite_scale_activation_fuse_pass",             //
+      "lite_scaleacts_fuse_pass",                    //
+      "lite_elementwise_scale_fuse_pass",            //
+      "lite_instance_norm_activation_fuse_pass",     //
+      "lite_flatten_fc_fuse_pass",                   //
+      "lite_fc_prelu_fuse_pass",                     //
+      "lite_elementwise_activation_fuse_pass",
+      "lite_conv_scale_fuse_pass",
+      "lite_conv_elementwise_tree_fuse_pass",
+      "lite_greater_than_cast_fuse_pass",
+      "fill_range_fuse_pass",
+      "identity_dropout_eliminate_pass",
+      "sparse_conv_detect_pass",
+      "keepdims_convert_pass",
+      "__xpu__max_pooling_pad_zero_detect_fuse_pass",
+      "__xpu__graph_dedup_pass",
+      "__xpu__resnet_fuse_pass",
+      "__xpu__conv2d_affine_channel_fuse_pass",
+      "__xpu__conv2d_fuse_pass",
+      "__xpu__squeeze_excitation_fuse_pass",
+      "__xpu__mmdnn_fuse_pass",
+      "__xpu__bigru_fuse_pass",
+      "__xpu__multi_encoder_fuse_pass",
+      "__xpu__embedding_with_eltwise_add_fuse_pass",
+      "__xpu__fc_fuse_pass",
+      "__xpu__softmax_topk_fuse_pass",
+      "__xpu__multi_encoder_adaptive_seqlen_fuse_pass",
+      "__xpu__multi_encoder_slice_link_fuse_pass",
+      "__xpu__generate_sequence_fuse_pass",
+      "__xpu__logit_fuse_pass",
+      "__xpu__link_previous_out_max_pass",
+      "fix_mismatched_precision_pass",
+      "__xpu__dynamic_lstm_fuse_pass",
+      "__xpu__multi_softmax_fuse_pass",
+      "npu_subgraph_pass",
+      "bm_subgraph_pass",
+      "fpga_concat_fuse_pass",
+      "control_flow_op_unused_inputs_and_outputs_eliminate_pass",
+      "static_kernel_pick_pass",  // pick original kernel from graph
 #ifdef LITE_WITH_XPU
-       "__xpu__static_kernel_pick_pass",  // xpu pick original kernel from graph
+      "__xpu__static_kernel_pick_pass",  // xpu pick original kernel from graph
 #endif
 
-       "remove_tf_redundant_ops_pass",
-       "variable_place_inference_pass",  // inference arg/var's
-       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
-       "__fpga_kernel_place_correct_pass",
-       // "opencl_kernel_place_correct_pass", // uncommit this pass
-       // info(target/precision/layout/device)
-       // using kernel info
-       "argument_type_display_pass",  // debug pass: show arg-type-node's
-                                      // info
-                                      // (target/precision/layout/device)
+      "remove_tf_redundant_ops_pass",
+      "variable_place_inference_pass",  // inference arg/var's
+      "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+      "__fpga_kernel_place_correct_pass",
+      // "opencl_kernel_place_correct_pass", // uncommit this pass
+      // info(target/precision/layout/device)
+      // using kernel info
+      "argument_type_display_pass",  // debug pass: show arg-type-node's
+                                     // info
+                                     // (target/precision/layout/device)
 
-       "type_target_cast_pass",          // add io_copy/io_copy_once if meet
-                                         // different targets when last and next
-                                         // node
-       "variable_place_inference_pass",  //
-       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
-       "argument_type_display_pass",  //
+      "type_target_cast_pass",          // add io_copy/io_copy_once if meet
+                                        // different targets when last and next
+                                        // node
+      "variable_place_inference_pass",  //
+      "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+      "argument_type_display_pass",  //
 
-       "io_copy_kernel_pick_pass",    //
-       "argument_type_display_pass",  //
+      "io_copy_kernel_pick_pass",    //
+      "argument_type_display_pass",  //
 
-       "variable_place_inference_pass",  //
-       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
-       "argument_type_display_pass",  //
+      "variable_place_inference_pass",  //
+      "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+      "argument_type_display_pass",  //
 
-       "type_precision_cast_pass",       //
-       "variable_place_inference_pass",  //
-       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
-       "argument_type_display_pass",  //
+      "type_precision_cast_pass",       //
+      "variable_place_inference_pass",  //
+      "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+      "argument_type_display_pass",  //
 
-       "type_layout_cast_pass",  // add layout/layout_once op if meet
-                                 // different layout when last and next node
-       "argument_type_display_pass",  //
+      "type_layout_cast_pass",       // add layout/layout_once op if meet
+                                     // different layout when last and next node
+      "argument_type_display_pass",  //
 
-       "variable_place_inference_pass",  //
-       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
-       "argument_type_display_pass",
+      "variable_place_inference_pass",  //
+      "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+      "argument_type_display_pass",
 
-       "runtime_context_assign_pass",
-       "argument_type_display_pass",
-       "lite_inplace_fuse_pass",
+      "runtime_context_assign_pass",
+      "argument_type_display_pass",
+      "lite_inplace_fuse_pass",
 #if !(defined(LITE_WITH_FPGA) || defined(LITE_WITH_PRECISION_PROFILE))
-       "memory_optimize_pass",
-       "xpu_memory_optimize_pass"
+//"memory_optimize_pass",
+//"xpu_memory_optimize_pass"
 #endif
-      }};
+  }};
 
   // skip the discarded pass
   const std::vector<std::string> discarded_passes =
