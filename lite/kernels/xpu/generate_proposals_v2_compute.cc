@@ -323,21 +323,21 @@ void GenerateProposalsV2Compute::Run() {
 }  // namespace lite
 }  // namespace paddle
 
-REGISTER_LITE_KERNEL(generate_proposals_v2,
-                     kXPU,
-                     kFloat,
-                     kNCHW,
-                     paddle::lite::kernels::xpu::GenerateProposalsV2Compute,
-                     def)
-    .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("BboxDeltas", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("ImShape", {LiteType::GetTensorTy(TARGET(kHost))})
-    .BindInput("Anchors", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("Variances", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindOutput("RpnRois", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindOutput("RpnRoiProbs", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindOutput("RpnRoisLod",
-                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt64))})
-    .BindOutput("RpnRoisNum",
-                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt64))})
-    .Finalize();
+// REGISTER_LITE_KERNEL(generate_proposals_v2,
+//                      kXPU,
+//                      kFloat,
+//                      kNCHW,
+//                      paddle::lite::kernels::xpu::GenerateProposalsV2Compute,
+//                      def)
+//     .BindInput("Scores", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("BboxDeltas", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("ImShape", {LiteType::GetTensorTy(TARGET(kHost))})
+//     .BindInput("Anchors", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("Variances", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindOutput("RpnRois", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindOutput("RpnRoiProbs", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindOutput("RpnRoisLod",
+//                 {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt64))})
+//     .BindOutput("RpnRoisNum",
+//                 {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt64))})
+//     .Finalize();

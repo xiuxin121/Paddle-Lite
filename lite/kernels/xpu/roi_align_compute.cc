@@ -99,15 +99,15 @@ void RoiAlignCompute::Run() {
 }  // namespace lite
 }  // namespace paddle
 
-REGISTER_LITE_KERNEL(roi_align,
-                     kXPU,
-                     kFloat,
-                     kNCHW,
-                     paddle::lite::kernels::xpu::RoiAlignCompute,
-                     def)
-    .BindInput("X", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("ROIs", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .BindInput("RoisNum",
-               {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU))})
-    .Finalize();
+// REGISTER_LITE_KERNEL(roi_align,
+//                      kXPU,
+//                      kFloat,
+//                      kNCHW,
+//                      paddle::lite::kernels::xpu::RoiAlignCompute,
+//                      def)
+//     .BindInput("X", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("ROIs", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .BindInput("RoisNum",
+//                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
+//     .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU))})
+//     .Finalize();
