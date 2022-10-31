@@ -105,7 +105,7 @@ void GenerateProposalsCompute::Run() {
   float* rpn_roi_probs_ptr = rpn_roi_probs->mutable_data<float>(TARGET(kXPU));
   int M = c_score * h_score * w_score;
   int K = std::min(pre_nms_top_n, M);
-  K = 100;
+  K = 200;
 
   im_info_guard_->Reserve(im_info->numel() * sizeof(float));
   float* im_info_ptr = reinterpret_cast<float*>(im_info_guard_->addr_);
