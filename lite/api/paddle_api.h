@@ -14,7 +14,7 @@
 
 /*
  * This file defines PaddlePredictor, the api for lite. It supports multiple
- * hardware including ARM, X86, OpenCL, CUDA and so on.
+ * hardware including ARM, X86, OpenCL and so on.
  */
 
 #ifndef PADDLE_LITE_API_H_  // NOLINT
@@ -380,16 +380,8 @@ class LITE_API CxxConfig : public ConfigBase {
   float sparse_threshold_{0.6f};
   std::map<int, std::vector<std::shared_ptr<void>>>
       preferred_inputs_for_warmup_;
-#ifdef LITE_WITH_CUDA
-  bool multi_stream_{false};
-#endif
-#ifdef LITE_WITH_MLU
-  lite_api::MLUCoreVersion mlu_core_version_{lite_api::MLUCoreVersion::MLU_270};
-  int mlu_core_number_{1};
-  DataLayoutType mlu_input_layout_{DATALAYOUT(kNCHW)};
-  std::vector<float> mlu_first_conv_mean_{};
-  std::vector<float> mlu_first_conv_std_{};
-#endif
+  std::map<TargetType, std::shared_ptr<void>> runtime_option_;
+
   // The custom configuration file or buffer for the NNAdapter subgraph
   // partition, here is an example:
   // op_type:in_var_name_0,in_var_name1:out_var_name_0,out_var_name1
@@ -402,7 +394,7 @@ class LITE_API CxxConfig : public ConfigBase {
   std::string mixed_precision_quantization_config_buffer_;
 
  public:
-  void set_valid_places(const std::vector<Place>& x) { valid_places_ = x; }
+  void set_valid_places(const std::vector<Place>& x);
   void set_model_file(const std::string& path) { model_file_ = path; }
   void set_param_file(const std::string& path) { param_file_ = path; }
   void set_model_buffer(const char* model_buffer,
@@ -434,34 +426,15 @@ class LITE_API CxxConfig : public ConfigBase {
   // but is_model_from_memory is recommended and `model_from_memory` will be
   // abandoned in v3.0.
   bool model_from_memory() const { return static_cast<bool>(model_buffer_); }
+  const std::shared_ptr<void> get_runtime_option() const {
+    for (auto i = runtime_option_.begin(); i != runtime_option_.end(); ++i) {
+      if (i->first == TARGET(kXPU)) {
+        return i->second;
+      }
+    }
 
-#ifdef LITE_WITH_CUDA
-  void set_multi_stream(bool multi_stream) { multi_stream_ = multi_stream; }
-  bool multi_stream() const { return multi_stream_; }
-#endif
-
-#ifdef LITE_WITH_MLU
-  // set MLU core version, which is used when compiling MLU kernels
-  void set_mlu_core_version(lite_api::MLUCoreVersion core_version);
-  // set MLU core number, which is used when compiling MLU kernels
-  void set_mlu_core_number(int core_number);
-  // whether use MLU's first conv kernel. First conv is a special kernel
-  // provided by MLU, its input is uint8, and also needs two 3-dimentional
-  // vectors which save all inputs' mean and std values
-  // set the 3-dimentional mean vector and 3-dimentional std vector used by
-  // MLU's first conv
-  void set_mlu_firstconv_param(const std::vector<float>& mean,
-                               const std::vector<float>& std);
-  // set MLU input layout. User can specify layout of input data to be NHWC,
-  // default is NCHW
-  void set_mlu_input_layout(DataLayoutType layout);
-
-  lite_api::MLUCoreVersion mlu_core_version() const;
-  int mlu_core_number() const;
-  DataLayoutType mlu_input_layout() const;
-  // std::pair<mean, std>
-  std::pair<std::vector<float>, std::vector<float>> mlu_firstconv_param() const;
-#endif
+    return nullptr;
+  }
 
   // XPU only, set the size of the workspace memory from L3 cache for the
   // current thread.

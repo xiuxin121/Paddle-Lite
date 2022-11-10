@@ -21,17 +21,11 @@
 #include "lite/core/target_wrapper.h"
 #include "lite/core/tensor.h"
 
-#ifdef LITE_WITH_CUDA
-#include "lite/backends/cuda/target_wrapper.h"
-#endif
 #ifdef LITE_WITH_XPU
 #include <functional>
 #include <mutex>  // NOLINT
+#include "lite/backends/xpu/runtime_option.h"
 #include "lite/backends/xpu/target_wrapper.h"
-#endif
-
-#ifdef LITE_WITH_MLU
-#include "lite/backends/mlu/target_wrapper.h"
 #endif
 
 #ifdef LITE_WITH_OPENCL
@@ -159,20 +153,6 @@ void Tensor::CopyFromCpu(const T *src_data) {
   if (type == TargetType::kHost || type == TargetType::kARM) {
     lite::TargetWrapperHost::MemcpySync(
         data, src_data, num * sizeof(T), lite::IoDirection::HtoH);
-  } else if (type == TargetType::kCUDA) {
-#ifdef LITE_WITH_CUDA
-    lite::TargetWrapperCuda::MemcpySync(
-        data, src_data, num * sizeof(T), lite::IoDirection::HtoD);
-#else
-    LOG(FATAL) << "Please compile the lib with CUDA.";
-#endif
-  } else if (type == TargetType::kMLU) {
-#ifdef LITE_WITH_MLU
-    lite::TargetWrapperMlu::MemcpySync(
-        data, src_data, num * sizeof(T), lite::IoDirection::HtoD);
-#else
-    LOG(FATAL) << "Please compile the lib with MLU.";
-#endif
   } else if (type == TargetType::kMetal) {
 #ifdef LITE_WITH_METAL
     lite::TargetWrapperMetal::MemcpySync(
@@ -181,7 +161,7 @@ void Tensor::CopyFromCpu(const T *src_data) {
     LOG(FATAL) << "Please compile the lib with METAL.";
 #endif
   } else {
-    LOG(FATAL) << "The CopyFromCpu interface just support kHost, kARM, kCUDA";
+    LOG(FATAL) << "The CopyFromCpu interface just support kHost, kARM";
   }
 }
 template <typename T>
@@ -196,20 +176,6 @@ void Tensor::CopyToCpu(T *data) const {
   if (type == TargetType::kHost || type == TargetType::kARM) {
     lite::TargetWrapperHost::MemcpySync(
         data, src_data, num * sizeof(T), lite::IoDirection::HtoH);
-  } else if (type == TargetType::kCUDA) {
-#ifdef LITE_WITH_CUDA
-    lite::TargetWrapperCuda::MemcpySync(
-        data, src_data, num * sizeof(T), lite::IoDirection::DtoH);
-#else
-    LOG(FATAL) << "Please compile the lib with CUDA.";
-#endif
-  } else if (type == TargetType::kMLU) {
-#ifdef LITE_WITH_MLU
-    lite::TargetWrapperMlu::MemcpySync(
-        data, src_data, num * sizeof(T), lite::IoDirection::DtoH);
-#else
-    LOG(FATAL) << "Please compile the lib with MLU.";
-#endif
   } else if (type == TargetType::kMetal) {
 #ifdef LITE_WITH_METAL
     lite::TargetWrapperMetal::MemcpySync(
@@ -218,7 +184,7 @@ void Tensor::CopyToCpu(T *data) const {
     LOG(FATAL) << "Please compile the lib with METAL.";
 #endif
   } else {
-    LOG(FATAL) << "The CopyToCpu interface just support kHost, kARM, kCUDA";
+    LOG(FATAL) << "The CopyToCpu interface just support kHost, kARM";
   }
 }
 
@@ -233,17 +199,6 @@ template void Tensor::CopyFromCpu<int64_t, TargetType::kARM>(const int64_t *);
 template void Tensor::CopyFromCpu<float, TargetType::kARM>(const float *);
 template void Tensor::CopyFromCpu<int8_t, TargetType::kARM>(const int8_t *);
 template void Tensor::CopyFromCpu<uint8_t, TargetType::kARM>(const uint8_t *);
-
-template void Tensor::CopyFromCpu<int, TargetType::kCUDA>(const int *);
-template void Tensor::CopyFromCpu<int64_t, TargetType::kCUDA>(const int64_t *);
-template void Tensor::CopyFromCpu<float, TargetType::kCUDA>(const float *);
-template void Tensor::CopyFromCpu<uint8_t, TargetType::kCUDA>(const uint8_t *);
-template void Tensor::CopyFromCpu<int8_t, TargetType::kCUDA>(const int8_t *);
-
-template void Tensor::CopyFromCpu<int, TargetType::kMLU>(const int *);
-template void Tensor::CopyFromCpu<int64_t, TargetType::kMLU>(const int64_t *);
-template void Tensor::CopyFromCpu<float, TargetType::kMLU>(const float *);
-template void Tensor::CopyFromCpu<int8_t, TargetType::kMLU>(const int8_t *);
 
 template void Tensor::CopyToCpu(float *) const;
 template void Tensor::CopyToCpu(int *) const;
@@ -495,32 +450,6 @@ const CxxModelBuffer &CxxConfig::get_model_buffer() const {
   return *model_buffer_;
 }
 
-#ifdef LITE_WITH_MLU
-void CxxConfig::set_mlu_core_version(lite_api::MLUCoreVersion core_version) {
-  mlu_core_version_ = core_version;
-}
-void CxxConfig::set_mlu_core_number(int core_number) {
-  mlu_core_number_ = core_number;
-}
-void CxxConfig::set_mlu_input_layout(DataLayoutType layout) {
-  mlu_input_layout_ = layout;
-}
-void CxxConfig::set_mlu_firstconv_param(const std::vector<float> &mean,
-                                        const std::vector<float> &std) {
-  mlu_first_conv_mean_ = mean;
-  mlu_first_conv_std_ = std;
-}
-lite_api::MLUCoreVersion CxxConfig::mlu_core_version() const {
-  return mlu_core_version_;
-}
-int CxxConfig::mlu_core_number() const { return mlu_core_number_; }
-DataLayoutType CxxConfig::mlu_input_layout() const { return mlu_input_layout_; }
-std::pair<std::vector<float>, std::vector<float>>
-CxxConfig::mlu_firstconv_param() const {
-  return std::make_pair(mlu_first_conv_mean_, mlu_first_conv_std_);
-}
-#endif
-
 // **DEPRECATED**, use set_xpu_l3_cache_method() in the future
 void CxxConfig::set_xpu_workspace_l3_size_per_thread(int l3_size) {
 #ifdef LITE_WITH_XPU
@@ -550,10 +479,14 @@ void CxxConfig::set_xpu_l3_cache_method(size_t l3_size, bool locked) {
       CHECK(lite::TargetWrapperXPU::shared_l3_size >= l3_size)
           << "Enlarge XPU Shared L3 Cache Is Not Allowed.";
     }
-    lite::TargetWrapperXPU::local_l3_size = 0;
+    reinterpret_cast<lite::XPURunTimeOption *>(
+        runtime_option_[TARGET(kXPU)].get())
+        ->xpu_local_l3_size = 0;
     lite::TargetWrapperXPU::need_l3_mutex = true;
   } else {
-    lite::TargetWrapperXPU::local_l3_size = l3_size;
+    reinterpret_cast<lite::XPURunTimeOption *>(
+        runtime_option_[TARGET(kXPU)].get())
+        ->xpu_local_l3_size = l3_size;
     lite::TargetWrapperXPU::need_l3_mutex = false;
   }
 #else
@@ -565,7 +498,9 @@ void CxxConfig::set_xpu_l3_cache_method(size_t l3_size, bool locked) {
 
 void CxxConfig::set_xpu_l3_cache_autotune(bool autotune) {
 #ifdef LITE_WITH_XPU
-  lite::TargetWrapperXPU::local_l3_autotune = autotune;
+  reinterpret_cast<lite::XPURunTimeOption *>(
+      runtime_option_[TARGET(kXPU)].get())
+      ->xpu_local_l3_autotune = autotune;
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_l3_cache_autotune' is ignored, please "
@@ -573,9 +508,11 @@ void CxxConfig::set_xpu_l3_cache_autotune(bool autotune) {
 #endif
 }
 
-void set_xpu_gm_workspace_method(size_t gm_size) {
+void CxxConfig::set_xpu_gm_workspace_method(size_t gm_size) {
 #ifdef LITE_WITH_XPU
-  lite::TargetWrapperXPU::local_gm_size = gm_size;
+  reinterpret_cast<lite::XPURunTimeOption *>(
+      runtime_option_[TARGET(kXPU)].get())
+      ->xpu_local_gm_size = gm_size;
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_gm_workspace_method' is ignored, please "
@@ -585,7 +522,9 @@ void set_xpu_gm_workspace_method(size_t gm_size) {
 
 void CxxConfig::set_xpu_dev_per_thread(int dev_no) {
 #ifdef LITE_WITH_XPU
-  lite::TargetWrapperXPU::SetDev(dev_no);
+  reinterpret_cast<lite::XPURunTimeOption *>(
+      runtime_option_[TARGET(kXPU)].get())
+      ->xpu_dev_num = dev_no;
 #else
   LOG(WARNING) << "The invoking of the function 'set_xpu_dev_per_thread' is "
                   "ignored, please rebuild it with LITE_WITH_XPU=ON.";
@@ -594,7 +533,9 @@ void CxxConfig::set_xpu_dev_per_thread(int dev_no) {
 
 void CxxConfig::enable_xpu_multi_stream() {
 #ifdef LITE_WITH_XPU
-  lite::TargetWrapperXPU::enable_xpu_multi_stream();
+  reinterpret_cast<lite::XPURunTimeOption *>(
+      runtime_option_[TARGET(kXPU)].get())
+      ->xpu_enable_multi_stream = true;
 #else
   LOG(WARNING)
       << "The invoking of the function 'enable_xpu_stream_per_thread' is "
@@ -663,7 +604,9 @@ void CxxConfig::set_xpu_conv_autotune(bool autotune,
 
 void CxxConfig::set_xpu_cluster_num(const int num) {
 #ifdef LITE_WITH_XPU
-  lite::TargetWrapperXPU::cluster_num = num;
+  reinterpret_cast<lite::XPURunTimeOption *>(
+      runtime_option_[TARGET(kXPU)].get())
+      ->xpu_cluster_num = num;
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_cluster_num' is ignored, please "
@@ -673,7 +616,9 @@ void CxxConfig::set_xpu_cluster_num(const int num) {
 
 void CxxConfig::set_xpu_sdnn_num(const int num) {
 #ifdef LITE_WITH_XPU
-  lite::TargetWrapperXPU::sdnn_num = num;
+  reinterpret_cast<lite::XPURunTimeOption *>(
+      runtime_option_[TARGET(kXPU)].get())
+      ->xpu_sdnn_num = num;
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_sdnn_num' is ignored, please "
@@ -736,6 +681,20 @@ _SetPreferredInputsForWarmup(double);
 _SetPreferredInputsForWarmup(int32_t);
 _SetPreferredInputsForWarmup(int64_t);
 #undef _SetPreferredInputsForWarmup
+
+void CxxConfig::set_valid_places(const std::vector<Place> &x) {
+  valid_places_ = x;
+  for (auto place : x) {
+    if (place.target == TARGET(kXPU)) {
+#ifdef LITE_WITH_XPU
+      std::shared_ptr<void> runtime_option =
+          std::shared_ptr<lite::XPURunTimeOption>(new lite::XPURunTimeOption);
+      runtime_option_.emplace(TARGET(kXPU), std::move(runtime_option));
+      break;
+#endif
+    }
+  }
+}
 
 // set model data in combined format, `set_model_from_file` refers to loading
 // model from file, set_model_from_buffer refers to loading model from memory
