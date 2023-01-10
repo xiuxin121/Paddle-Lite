@@ -51,6 +51,7 @@ class QuantDequantFusePass : public ProgramPass {
               pre_op_inst.op_info()->GetAttr<float>("out_threshold");
           instruct.mutable_op_info()->SetAttr<float>("input_threshold",
                                                      pre_op_out_threshold);
+          instruct.mutable_op_info()->SetAttr<bool>("enable_int8", true);
         }
 
         // pre link op is fused conv2d/fc.

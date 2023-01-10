@@ -53,7 +53,8 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
       if ((xpu_use_fp16_optimizer_ &&
            xpu_special_op_.count(node->AsStmt().op_type())) ||
           (xpu_use_int8_optimizer_ &&
-           xpu_int8_special_op_.count(node->AsStmt().op_type()))) {
+           (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
+            xpu_int8_general_op_.count(node->AsStmt().op_type())))) {
         SpecialNodeInputPrecision(node);
         continue;
       }
@@ -809,8 +810,8 @@ void XPUStaticKernelPickPass::GradeXPUKernelScore(
       return;
     }
 
-    if (xpu_use_int8_optimizer_ &&
-        !instruct.op_info()->HasAttr("enable_int8") &&
+    if (xpu_use_int8_optimizer_ && instruct.op_info()->HasAttr("enable_int8") &&
+        instruct.op_info()->GetAttr<bool>("enable_int8") &&
         xpu_int8_general_op_.count(instruct.op_type())) {
       GeneralInt8OpScore(node, kernel, type_match, score);
       return;

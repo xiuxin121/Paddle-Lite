@@ -644,6 +644,9 @@ void CxxConfig::set_xpu_dump_tensor_path(const std::string dump_tensor_path) {
   reinterpret_cast<lite::XPURunTimeOption *>(
       target_configs()[TARGET(kXPU)].get())
       ->xpu_dump_tensor_path = dump_tensor_path;
+  add_discarded_pass("xpu_memory_optimize_pass");
+  add_discarded_pass("memory_optimize_pass");
+
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_dump_tensor_path' is ignored, please "
@@ -656,6 +659,8 @@ void CxxConfig::set_xpu_dump_log_path(const std::string dump_log_path) {
   reinterpret_cast<lite::XPURunTimeOption *>(
       target_configs()[TARGET(kXPU)].get())
       ->xpu_dump_log_path = dump_log_path;
+  add_discarded_pass("xpu_memory_optimize_pass");
+  add_discarded_pass("memory_optimize_pass");
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_dump_log_path' is ignored, please "
