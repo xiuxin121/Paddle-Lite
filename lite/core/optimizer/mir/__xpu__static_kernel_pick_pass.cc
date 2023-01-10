@@ -239,6 +239,17 @@ bool XPUStaticKernelPickPass::ForceUsePrecision(
     return true;
   }
 
+  if (kernel.precision() == PRECISION(kInt8) &&
+      !(op_info->HasAttr("enable_int8") &&
+        op_info->GetAttr<bool>("enable_int8"))) {
+    *score = 0;
+    VLOG(6) << instruct.op_type() << "not pick int8 kernel,thanks to this op "
+                                     "has not has attr:enable_int8,or "
+                                     " attr:enable_int8 is false. "
+            << kernel.summary();
+    return true;
+  }
+
   return false;
 }
 
@@ -715,6 +726,49 @@ void XPUStaticKernelPickPass::SpecialOpScore(lite::mir::Node* node,
   *score += score_tmp_all;
 }
 
+void XPUStaticKernelPickPass::GeneralInt8OpScore(lite::mir::Node* node,
+                                                 const lite::KernelBase& kernel,
+                                                 bool* type_match,
+                                                 size_t* score) {
+  auto& instruct = node->AsStmt();
+  for (auto* in_node : node->inlinks) {
+    CHECK(in_node->IsArg());
+    auto& var = in_node->AsArg();
+    const auto& var_name = var.name;
+    std::string tmp;
+    CHECK(instruct.op_info()->GetInputArgname(var_name, &tmp));
+    if (in_node->inlinks.empty() && xpu_output_type_.count(var_name) == 0) {
+      continue;
+    }
+
+    if (xpu_output_type_.count(var_name) == 0) {
+      continue;
+    }
+
+    VLOG(6) << "current kernel input data variable name:" << var_name
+            << ", Parameter name:" << tmp;
+
+    size_t score_tmp = 0;
+    if (kernel.GetInputDeclType(tmp)->precision() == PrecisionType::kAny) {
+      GetScore(PrecisionType::kAny, &score_tmp);
+      VLOG(6) << "match input data precision:kAny";
+    }
+
+    if (xpu_output_type_[var_name] ==
+            kernel.GetInputDeclType(tmp)->precision() ||
+        xpu_output_type_[var_name] == PrecisionType::kAny) {
+      GetScore(xpu_output_type_[var_name], &score_tmp);
+      VLOG(6) << "match input data precision";
+    }
+
+    if (score_tmp > 0) {
+      *type_match = true;
+    }
+
+    *score += score_tmp;
+  }
+}
+
 void XPUStaticKernelPickPass::GradeXPUKernelScore(
     lite::mir::Node* node,
     const lite::KernelBase& kernel,
@@ -749,14 +803,23 @@ void XPUStaticKernelPickPass::GradeXPUKernelScore(
          xpu_special_op_.count(instruct.op_type())) ||
         (xpu_use_int8_optimizer_ &&
          instruct.op_info()->HasAttr("enable_int8") &&
+         instruct.op_info()->GetAttr<bool>("enable_int8") &&
          xpu_int8_special_op_.count(instruct.op_type()))) {
       SpecialOpScore(node, kernel, type_match, score);
+      return;
+    }
+
+    if (xpu_use_int8_optimizer_ &&
+        !instruct.op_info()->HasAttr("enable_int8") &&
+        xpu_int8_general_op_.count(instruct.op_type())) {
+      GeneralInt8OpScore(node, kernel, type_match, score);
       return;
     }
   }
 
   // kernel compute precision:fp32(int16),data precicion:fp32
-  if (!instruct.op_info()->HasAttr("enable_int8") ||
+  if (!(instruct.op_info()->HasAttr("enable_int8") &&
+        instruct.op_info()->GetAttr<bool>("enable_int8")) ||
       xpu_int8_special_op_.count(instruct.op_type()) == 0) {
     *type_match = true;
     if (instruct.op_type() == "feed") {
