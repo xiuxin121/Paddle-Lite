@@ -138,7 +138,8 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
       if ((xpu_use_fp16_optimizer_ &&
            xpu_special_op_.count(node->AsStmt().op_type())) ||
           (xpu_use_int8_optimizer_ &&
-           xpu_int8_special_op_.count(node->AsStmt().op_type()))) {
+           (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
+            xpu_int8_general_op_.count(instruct.op_type())))) {
         SpecialNodeOutputPrecision(graph, node, scored.front().second);
       } else if (xpu_inplace_op_.count(node->AsStmt().op_type())) {
         InplaceNodeOutputPrecision(node);
