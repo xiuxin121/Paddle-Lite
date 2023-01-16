@@ -36,6 +36,11 @@ class QuantDequantFusePass : public ProgramPass {
         continue;
       }
 
+      float out_scales = 0;
+      if (instruct.op_info()->HasAttr("out_threshold")) {
+        out_scales = instruct.op_info()->GetAttr<float>("out_threshold");
+      }
+
       for (auto* in_node : node->inlinks) {
         CHECK(in_node->IsArg());
         if (in_node->inlinks.empty()) {
@@ -52,6 +57,15 @@ class QuantDequantFusePass : public ProgramPass {
           instruct.mutable_op_info()->SetAttr<float>("input_threshold",
                                                      pre_op_out_threshold);
           instruct.mutable_op_info()->SetAttr<bool>("enable_int8", true);
+          if (out_scales != 0) {
+            for (auto op_out_var_node : node->outlinks) {
+              CHECK(op_out_var_node->IsArg());
+              instruct.mutable_op_info()->SetOutputScale(
+                  op_out_var_node->arg()->name, {out_scales});
+            }
+          }
+          auto update_desc = *instruct.mutable_op_info();
+          instruct.ResetOp(update_desc, graph->valid_places());
         }
 
         // pre link op is fused conv2d/fc.
@@ -61,6 +75,8 @@ class QuantDequantFusePass : public ProgramPass {
                   "Output0_scale")[0];
           instruct.mutable_op_info()->SetAttr<float>("input_threshold",
                                                      pre_op_out_threshold);
+          auto update_desc = *instruct.mutable_op_info();
+          instruct.ResetOp(update_desc, graph->valid_places());
         }
       }
     }
