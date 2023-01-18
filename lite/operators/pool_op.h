@@ -98,6 +98,11 @@ class PoolOpLite : public OpLite {
     if (op_desc.HasAttr("pad_zero")) {
       param_.pad_zero = op_desc.GetAttr<bool>("pad_zero");
     }
+    if (op_desc.HasAttr("Out0_scale") && op_desc.HasAttr("Input0_scale")) {
+      param_.enable_int8 = true;
+      param_.output_scale = op_desc.GetAttr<float>("Out0_scale");
+      param_.input_scale = op_desc.GetAttr<float>("Input0_scale");
+    }
 #endif
     return true;
   }
