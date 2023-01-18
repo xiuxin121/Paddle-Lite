@@ -53,7 +53,8 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
       if ((xpu_use_fp16_optimizer_ &&
            xpu_special_op_.count(node->AsStmt().op_type())) ||
           (xpu_use_int8_optimizer_ &&
-           xpu_int8_special_op_.count(node->AsStmt().op_type()))) {
+           (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
+            xpu_int8_general_op_.count(node->AsStmt().op_type())))) {
         SpecialNodeInputPrecision(node);
         continue;
       }
@@ -73,6 +74,10 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
 
       InplaceNodeInputPrecision(node);
     }
+  }
+
+  if (xpu_use_int8_optimizer_) {
+    SetEnableInt8Attribute(graph);
   }
 
   // sort kernels by the factors.
@@ -111,13 +116,15 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
     for (auto&& kernel : instruct.kernels()) {
       VLOG(2) << "current candidate kernel is: " << kernel->summary();
       VLOG(2) << "valid_places size is: " << graph->valid_places().size();
-      if (instruct.op_info()->HasAttr("enable_int8") &&
-          instruct.op_info()->GetAttr<bool>("enable_int8") &&
-          kernel->precision() != PrecisionType::kInt8 &&
-          instruct.op_type() != "__xpu__multi_encoder") {
-        VLOG(6) << "Ignore current kernel: " << kernel->summary()
-                << ", because we only want to pick int8 precision kernel.";
-        continue;
+      if (!xpu_disable_int_op_.count(instruct.op_type())) {
+        if (instruct.op_info()->HasAttr("enable_int8") &&
+            instruct.op_info()->GetAttr<bool>("enable_int8") &&
+            kernel->precision() != PrecisionType::kInt8 &&
+            instruct.op_type() != "__xpu__multi_encoder") {
+          VLOG(6) << "Ignore current kernel: " << kernel->summary()
+                  << ", because we only want to pick int8 precision kernel.";
+          continue;
+        }
       }
 
       float score = KernelGrade(node,
@@ -137,7 +144,8 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
       if ((xpu_use_fp16_optimizer_ &&
            xpu_special_op_.count(node->AsStmt().op_type())) ||
           (xpu_use_int8_optimizer_ &&
-           xpu_int8_special_op_.count(node->AsStmt().op_type()))) {
+           (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
+            xpu_int8_general_op_.count(instruct.op_type())))) {
         SpecialNodeOutputPrecision(graph, node, scored.front().second);
       } else if (xpu_inplace_op_.count(node->AsStmt().op_type())) {
         InplaceNodeOutputPrecision(node);
@@ -173,7 +181,6 @@ void XPUStaticKernelPickPass::DataPrecisionDicide(
       graph->valid_places()[0].target == TargetType::kXPU) {
     xpu_use_int8_optimizer_ = true;
     VLOG(2) << "XPU auto use data precision: FP16/FP32/INT16/INT8 ";
-
     return;
   }
 }
@@ -195,11 +202,13 @@ bool XPUStaticKernelPickPass::ForceUsePrecision(
       << "You can only specify one quant type for an OP!";
 
   if (instruct.op_type() == "__xpu__fc") {
-    if (int8_quant && kernel.alias() == "XPU_Int8_FP32_FP32") {
+    if (int8_quant && kernel.alias() == "XPU_Int8_FP32_FP32" &&
+        !encode_precision_.empty()) {
       *score *= 4;
       VLOG(6) << "__xpu__fc: force use PRECISON INT8: *4";
       return true;
-    } else if (int16_quant && kernel.alias() == "XPUFC_INT16_FP32_FP32") {
+    } else if (int16_quant && kernel.alias() == "XPUFC_INT16_FP32_FP32" &&
+               !encode_precision_.empty()) {
       *score *= 4;
       VLOG(6) << "__xpu__fc: force use PRECISON INT16: *4";
       return true;
@@ -239,6 +248,17 @@ bool XPUStaticKernelPickPass::ForceUsePrecision(
     return true;
   }
 
+  if (kernel.precision() == PRECISION(kInt8) &&
+      !(op_info->HasAttr("enable_int8") &&
+        op_info->GetAttr<bool>("enable_int8"))) {
+    *score = 0;
+    VLOG(6) << instruct.op_type() << "not pick int8 kernel,thanks to this op "
+                                     "has not has attr:enable_int8,or "
+                                     " attr:enable_int8 is false. "
+            << kernel.summary();
+    return true;
+  }
+
   return false;
 }
 
@@ -253,7 +273,7 @@ void XPUStaticKernelPickPass::GetScore(PrecisionType precision,
   } else if (precision == PrecisionType::kAny) {
     *score_tmp = *score_tmp > 1 ? *score_tmp : 1;
   } else {
-    *score_tmp = *score_tmp > 5 ? *score_tmp : 5;
+    *score_tmp = *score_tmp > 6 ? *score_tmp : 6;
   }
 }
 
@@ -715,6 +735,69 @@ void XPUStaticKernelPickPass::SpecialOpScore(lite::mir::Node* node,
   *score += score_tmp_all;
 }
 
+void XPUStaticKernelPickPass::SliceForceNotUseXPU(
+    lite::mir::Node* node,
+    const lite::KernelBase& kernel,
+    bool* type_match,
+    size_t* score) {
+  for (auto in_var_node : node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    if (in_var_node->inlinks.empty()) continue;
+    for (auto iter_node = in_var_node->inlinks.begin();
+         iter_node != in_var_node->inlinks.end();
+         iter_node++) {
+      if (!(*iter_node)->IsStmt()) continue;
+      if (((*iter_node)->AsStmt().op_type() == "shape") &&
+          (kernel.place().target == TARGET(kXPU))) {
+        *score = 0;
+      }
+    }
+  }
+}
+
+void XPUStaticKernelPickPass::GeneralInt8OpScore(lite::mir::Node* node,
+                                                 const lite::KernelBase& kernel,
+                                                 bool* type_match,
+                                                 size_t* score) {
+  auto& instruct = node->AsStmt();
+  for (auto* in_node : node->inlinks) {
+    CHECK(in_node->IsArg());
+    auto& var = in_node->AsArg();
+    const auto& var_name = var.name;
+    std::string tmp;
+    CHECK(instruct.op_info()->GetInputArgname(var_name, &tmp));
+    if (in_node->inlinks.empty() && xpu_output_type_.count(var_name) == 0) {
+      continue;
+    }
+
+    if (xpu_output_type_.count(var_name) == 0) {
+      continue;
+    }
+
+    VLOG(6) << "current kernel input data variable name:" << var_name
+            << ", Parameter name:" << tmp;
+
+    size_t score_tmp = 0;
+    if (kernel.GetInputDeclType(tmp)->precision() == PrecisionType::kAny) {
+      GetScore(PrecisionType::kAny, &score_tmp);
+      VLOG(6) << "match input data precision:kAny";
+    }
+
+    if (xpu_output_type_[var_name] ==
+            kernel.GetInputDeclType(tmp)->precision() ||
+        xpu_output_type_[var_name] == PrecisionType::kAny) {
+      GetScore(xpu_output_type_[var_name], &score_tmp);
+      VLOG(6) << "match input data precision";
+    }
+
+    if (score_tmp > 0) {
+      *type_match = true;
+    }
+
+    *score += score_tmp;
+  }
+}
+
 void XPUStaticKernelPickPass::GradeXPUKernelScore(
     lite::mir::Node* node,
     const lite::KernelBase& kernel,
@@ -749,14 +832,27 @@ void XPUStaticKernelPickPass::GradeXPUKernelScore(
          xpu_special_op_.count(instruct.op_type())) ||
         (xpu_use_int8_optimizer_ &&
          instruct.op_info()->HasAttr("enable_int8") &&
+         instruct.op_info()->GetAttr<bool>("enable_int8") &&
          xpu_int8_special_op_.count(instruct.op_type()))) {
       SpecialOpScore(node, kernel, type_match, score);
       return;
     }
+
+    if (xpu_use_int8_optimizer_ && instruct.op_info()->HasAttr("enable_int8") &&
+        instruct.op_info()->GetAttr<bool>("enable_int8") &&
+        xpu_int8_general_op_.count(instruct.op_type())) {
+      GeneralInt8OpScore(node, kernel, type_match, score);
+      return;
+    }
+  }
+
+  if (instruct.op_type() == "slice") {
+    SliceForceNotUseXPU(node, kernel, type_match, score);
   }
 
   // kernel compute precision:fp32(int16),data precicion:fp32
-  if (!instruct.op_info()->HasAttr("enable_int8") ||
+  if (!(instruct.op_info()->HasAttr("enable_int8") &&
+        instruct.op_info()->GetAttr<bool>("enable_int8")) ||
       xpu_int8_special_op_.count(instruct.op_type()) == 0) {
     *type_match = true;
     if (instruct.op_type() == "feed") {
@@ -815,6 +911,70 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
   }
 
   return;
+}
+
+// Only pick some ops for  int8 compute in XPU.
+// Op pick int8 kernel in XPU, when has enable_int8 attribute.
+void XPUStaticKernelPickPass::SetEnableInt8Attribute(
+    const std::unique_ptr<SSAGraph>& graph) {
+  for (auto& op_node : graph->StmtTopologicalOrder()) {
+    if (!op_node->IsStmt()) continue;
+    auto& instruct = op_node->AsStmt();
+    auto op_type = instruct.mutable_op_info()->Type();
+    if (!(xpu_int8_general_op_.count(op_type) ||
+          xpu_inplace_op_.count(op_type))) {
+      continue;
+    }
+
+    bool quant_int8 = true;
+    if (!xpu_inplace_op_.count(op_type)) {
+      for (auto in_var_node : op_node->inlinks) {
+        CHECK(in_var_node->IsArg());
+        auto in_var_name = in_var_node->arg()->name;
+        if (!instruct.mutable_op_info()->HasInputScale(in_var_name)) {
+          quant_int8 = false;
+          break;
+        }
+      }
+
+      // Temp add for ppyolo.
+      if (op_type == "concat") {
+        for (auto out_var_node : op_node->outlinks) {
+          CHECK(out_var_node->IsArg());
+          auto out_var_name = out_var_node->arg()->name;
+          if (!instruct.mutable_op_info()->HasOutputScale(out_var_name)) {
+            quant_int8 = false;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!quant_int8) {
+      instruct.mutable_op_info()->SetAttr<bool>("enable_int8", false);
+      auto update_desc = *instruct.mutable_op_info();
+      instruct.ResetOp(update_desc, graph->valid_places());
+      continue;
+    }
+
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      if (in_var_node->inlinks.empty()) continue;
+      for (auto iter_node = in_var_node->inlinks.begin();
+           iter_node != in_var_node->inlinks.end();
+           iter_node++) {
+        if (!(*iter_node)->IsStmt()) continue;
+        auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+        if (pre_op_info->HasAttr("enable_int8") &&
+            pre_op_info->GetAttr<bool>("enable_int8")) {
+          instruct.mutable_op_info()->SetAttr<bool>("enable_int8", true);
+          auto update_desc = *instruct.mutable_op_info();
+          instruct.ResetOp(update_desc, graph->valid_places());
+          break;
+        }
+      }
+    }
+  }
 }
 
 }  // namespace mir
