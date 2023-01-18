@@ -379,13 +379,6 @@ void ConfigBase::add_discarded_pass(const std::string pass) {
   return;
 }
 
-// Set external custom allocator
-void ConfigBase::set_custom_allocator(TargetType target_type,
-                                      CustomAllocator custom_allocator) {
-  // TODO(shentanyue): TargetType will be supported in the future.
-  lite::Allocator::Global().SetCustomAllocator(custom_allocator);
-}
-
 #ifdef LITE_WITH_X86
 void ConfigBase::set_x86_math_num_threads(int threads) {
   x86_math_num_threads_ = threads;
@@ -646,11 +639,13 @@ void CxxConfig::set_xpu_sdnn_num(const int num) {
 #endif
 }
 
-void CxxConfig::set_xpu_dump_tensor_path(const std::string dump_tensor_path) {
+void CxxConfig::set_xpu_dump_tensor_path(const std::string &dump_tensor_path) {
 #ifdef LITE_WITH_XPU
   reinterpret_cast<lite::XPURunTimeOption *>(
       target_configs()[TARGET(kXPU)].get())
       ->xpu_dump_tensor_path = dump_tensor_path;
+  add_discarded_pass("xpu_memory_optimize_pass");
+  add_discarded_pass("memory_optimize_pass");
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_dump_tensor_path' is ignored, please "
@@ -658,11 +653,13 @@ void CxxConfig::set_xpu_dump_tensor_path(const std::string dump_tensor_path) {
 #endif
 }
 
-void CxxConfig::set_xpu_dump_log_path(const std::string dump_log_path) {
+void CxxConfig::set_xpu_dump_log_path(const std::string &dump_log_path) {
 #ifdef LITE_WITH_XPU
   reinterpret_cast<lite::XPURunTimeOption *>(
       target_configs()[TARGET(kXPU)].get())
       ->xpu_dump_log_path = dump_log_path;
+  add_discarded_pass("xpu_memory_optimize_pass");
+  add_discarded_pass("memory_optimize_pass");
 #else
   LOG(WARNING) << "The invoking of the function "
                   "'set_xpu_dump_log_path' is ignored, please "

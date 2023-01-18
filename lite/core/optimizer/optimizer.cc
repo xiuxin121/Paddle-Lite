@@ -147,6 +147,7 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        // quantized ops are inferred by the propagation method according to the
        // input scales and out_threashold.
        "quantization_parameters_propagation_pass",
+       "__xpu__quantization_parameters_propagation_pass",
        // Based on the custom mixed precision configuration information, remove
        // the quantization parameters of some quantized ops to force them to run
        // at fp32 precision.
@@ -198,7 +199,7 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        "__xpu__conv2d_affine_channel_fuse_pass",
        "__xpu__conv2d_fuse_pass",
        "__xpu__conv2d_scale_fuse_pass",
-       "__xpu__squeeze_excitation_fuse_pass",
+       //"__xpu__squeeze_excitation_fuse_pass",
        "__xpu__mmdnn_fuse_pass",
        "__xpu__bigru_fuse_pass",
        "__xpu__roformer_relative_pos_fuse_pass",
@@ -237,6 +238,11 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        // debug pass: show arg-type-node's info (target/precision/layout/device)
        "argument_type_display_pass",
 
+       "type_precision_cast_pass",
+       "variable_place_inference_pass",
+       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+       "argument_type_display_pass",
+
        // add io_copy/io_copy_once
        "type_target_cast_pass",
        "variable_place_inference_pass",
@@ -250,10 +256,10 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
        "argument_type_display_pass",
 
-       "type_precision_cast_pass",
-       "variable_place_inference_pass",
-       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
-       "argument_type_display_pass",
+       //"type_precision_cast_pass",
+       //  "variable_place_inference_pass",
+       //  "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+       //  "argument_type_display_pass",
 
        // add layout/layout_once op
        "type_layout_cast_pass",
