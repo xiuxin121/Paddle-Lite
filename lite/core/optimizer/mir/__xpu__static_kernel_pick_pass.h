@@ -80,7 +80,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
     encode_precision_ =
         lite::TargetWrapperXPU::xpu_runtime_ptr->multi_encoder_precision;
     if (encode_precision_.empty()) {
-      encode_precision_ = GetStringFromEnv("XPU_ENCODER_PRECISION", "int16");
+      encode_precision_ = GetStringFromEnv("XPU_ENCODER_PRECISION");
     }
 #endif
   }
@@ -206,6 +206,16 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
         VLOG(4) << "[score s5]:" << score;
       }
 
+      // temp add : xpu kernel multiclass output in cpu.
+      if (instruct.op_info()->Type() != "multiclass_nms3" && kernel_use_host_ &&
+          kernel.target() == TARGET(kXPU)) {
+        score = 0;
+      }
+
+      if (instruct.op_info()->Type() == "multiclass_nms3") {
+        kernel_use_host_ = true;
+      }
+
       if (weight * score > final_score) {
         final_score = weight * score;
         winner_place = place;
@@ -282,6 +292,11 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
       size_t* score,
       bool* type_match);
   void CollectXPUSpecialOPType(const std::unique_ptr<SSAGraph>& graph);
+  void GeneralInt8OpScore(lite::mir::Node* node,
+                          const lite::KernelBase& kernel,
+                          bool* type_match,
+                          size_t* score);
+  void SetEnableInt8Attribute(const std::unique_ptr<SSAGraph>& graph);
 
  private:
   core::KernelPickFactor kernel_pick_factors_;
@@ -300,12 +315,16 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                                               "squeeze",
                                               "squeeze2",
                                               "unsqueeze",
-                                              "unsqueeze2"};
+                                              "unsqueeze2",
+                                              "flatten_contiguous_range"};
   bool xpu_use_int8_optimizer_{false};
   std::set<std::string> xpu_int8_special_op_{"__xpu__fc", "__xpu__conv2d"};
+  std::set<std::string> xpu_int8_general_op_{
+      "pool2d", "elementwise_add", "elementwise_mul", "concat"};
 
   bool local_quant_{false};
   std::string encode_precision_;
+  bool kernel_use_host_ = false;
 };
 
 }  // namespace mir

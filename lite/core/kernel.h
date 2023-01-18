@@ -108,7 +108,8 @@ class KernelBase {
     }
 
     Run();
-
+    void* xpu_stream = TargetWrapperXPU::get_xpu_stream();
+    XPU_CALL(xpu_wait(xpu_stream));
     // skip test
     if (!is_kernel_test_) {
       SetProfileRuntimeKernelInfo(profiler_->GetOpCharacter(profile_id_));

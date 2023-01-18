@@ -45,6 +45,9 @@ void MulticlassNmsCompute::Run() {
   float nms_threshold = static_cast<float>(param.nms_threshold);
   float nms_eta = static_cast<float>(param.nms_eta);
   float score_threshold = static_cast<float>(param.score_threshold);
+  score_threshold = 0.1;
+  keep_top_k = 120;
+  nms_top_k = 512;
 
   int n = 0;
   int b = 0;
@@ -82,6 +85,7 @@ void MulticlassNmsCompute::Run() {
   std::vector<size_t> batch_starts;
 
   int r = 0;
+  nms_top_k = 500;
   r = xdnn::multiclass_nms<float, int>(ctx.GetRawContext(),
                                        boxes->data<float>(),
                                        scores->data<float>(),
