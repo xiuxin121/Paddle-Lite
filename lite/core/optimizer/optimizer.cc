@@ -98,9 +98,19 @@ void Optimizer::ApplyPasses(
   for (auto& pass : passes_) {
     LOG(INFO) << "== Running pass: " << pass->name();
     std::set<TargetType> targets;
+    bool int8_model_ = false;
     for (const auto& place : valid_places_) {
       targets.insert(place.target);
+      if (place.precision == PrecisionType::kInt8) {
+        int8_model_ = true;
+      }
     }
+
+    if (pass->name() == "__xpu__squeeze_excitation_fuse_pass" && int8_model_) {
+      continue;
+      LOG(INFO) << "XPU int8 model Skip " << pass->name();
+    }
+
     bool matched =
         PassMatchesTarget(*pass, targets) && PassMatchesKernels(*pass);
     if (!matched) {
@@ -147,6 +157,7 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        // quantized ops are inferred by the propagation method according to the
        // input scales and out_threashold.
        "quantization_parameters_propagation_pass",
+       "__xpu__quantization_parameters_propagation_pass",
        // Based on the custom mixed precision configuration information, remove
        // the quantization parameters of some quantized ops to force them to run
        // at fp32 precision.
@@ -236,6 +247,13 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        "opencl_kernel_place_correct_pass",
        // debug pass: show arg-type-node's info (target/precision/layout/device)
        "argument_type_display_pass",
+// precision cast pass must be  in front of target cast pass.
+#ifdef LITE_WITH_XPU
+       "type_precision_cast_pass",
+       "variable_place_inference_pass",
+       "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
+       "argument_type_display_pass",
+#endif
 
        // add io_copy/io_copy_once
        "type_target_cast_pass",
@@ -249,11 +267,12 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        "variable_place_inference_pass",
        "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
        "argument_type_display_pass",
-
+#ifndef LITE_WITH_XPU
        "type_precision_cast_pass",
        "variable_place_inference_pass",
        "control_flow_op_shared_inputs_and_outputs_place_sync_pass",
        "argument_type_display_pass",
+#endif
 
        // add layout/layout_once op
        "type_layout_cast_pass",
