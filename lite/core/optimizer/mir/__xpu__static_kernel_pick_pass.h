@@ -304,7 +304,8 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                                               "squeeze",
                                               "squeeze2",
                                               "unsqueeze",
-                                              "unsqueeze2"};
+                                              "unsqueeze2",
+                                              "flatten_contiguous_range"};
   bool xpu_use_int8_optimizer_{false};
   std::set<std::string> xpu_int8_special_op_{"__xpu__fc", "__xpu__conv2d"};
   std::set<std::string> xpu_int8_general_op_{"pool2d"};
