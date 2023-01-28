@@ -268,7 +268,7 @@ void XPUStaticKernelPickPass::GetScore(PrecisionType precision,
   } else if (precision == PrecisionType::kAny) {
     *score_tmp = *score_tmp > 1 ? *score_tmp : 1;
   } else {
-    *score_tmp = *score_tmp > 5 ? *score_tmp : 5;
+    *score_tmp = *score_tmp > 6 ? *score_tmp : 6;
   }
 }
 
