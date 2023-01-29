@@ -144,17 +144,16 @@ class XPUFcFuser : public FuseBase {
         per_channel = false;
         VLOG(3) << "xpu fc per tensor";
         weight_max.push_back(
-            op_info->GetAttr<std::vector<float>>("Y0_scale")[0] * 127);
+            op_info->GetAttr<std::vector<float>>("Y0_scale")[0]);
       } else {
         per_channel = true;
         VLOG(3) << "xpu fc per channel, first channel max:"
-                << op_info->GetAttr<std::vector<float>>("Y0_scale")[0] * 127
+                << op_info->GetAttr<std::vector<float>>("Y0_scale")[0]
                 << ", last channel max: "
                 << op_info->GetAttr<std::vector<float>>(
-                       "Y0_scale")[weight_scale_size - 1] *
-                       127;
+                       "Y0_scale")[weight_scale_size - 1];
         for (auto wm : op_info->GetAttr<std::vector<float>>("Y0_scale")) {
-          weight_max.push_back(wm * 127);
+          weight_max.push_back(wm);
         }
       }
       VLOG(3) << "weight_max size:" << weight_max.size();

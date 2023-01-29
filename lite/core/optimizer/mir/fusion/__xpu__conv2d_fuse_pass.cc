@@ -565,12 +565,12 @@ class XPUConv2dFuser : public FuseBase {
       if (is_per_tensor(max_weight_vector)) {
         per_channel = false;
         VLOG(4) << "xpu conv quant weight only use one  max value. ";
-        weight_max.push_back(max_weight_vector[0] * 127);
+        weight_max.push_back(max_weight_vector[0]);
       } else {
         per_channel = true;
         VLOG(4) << "xpu conv quant weight  use  max value per channel.";
         for (auto wm : max_weight_vector) {
-          weight_max.push_back(wm * 127);
+          weight_max.push_back(wm);
         }
       }
 
@@ -587,7 +587,8 @@ class XPUConv2dFuser : public FuseBase {
             {(matched.at("ew_branch_add_in")->inlinks.front())
                  ->stmt()
                  ->op_info()
-                 ->GetAttr<float>("out_threshold")});
+                 ->GetAttr<float>("out_threshold") /
+             127});
       }
 
       std::string op_name{};
