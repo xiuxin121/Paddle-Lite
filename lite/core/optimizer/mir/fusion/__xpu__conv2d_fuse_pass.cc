@@ -549,9 +549,8 @@ class XPUConv2dFuser : public FuseBase {
       // scale_value*127 in there.
       op_desc.SetAttr<std::vector<float>>(
           get_scale_name(input_name),
-          {127 *
-           matched.at("conv")->stmt()->op_info()->GetInputScale(
-               input_name)[0]});
+          {matched.at("conv")->stmt()->op_info()->GetInputScale(
+              input_name)[0]});
       bool per_channel = false;
       std::vector<float> weight_max;
       auto max_weight_vector =
@@ -609,7 +608,8 @@ class XPUConv2dFuser : public FuseBase {
       op_desc.SetAttr<std::vector<float>>(
           "Output0_scale",
           {matched.at(op_name)->stmt()->op_info()->GetAttr<float>(
-              "out_threshold")});
+               "out_threshold") /
+           127});
       op_desc.SetAttr<float>(
           "out_threshold",
           matched.at(op_name)->stmt()->op_info()->GetAttr<float>(

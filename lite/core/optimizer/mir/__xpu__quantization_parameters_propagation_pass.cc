@@ -365,7 +365,7 @@ void XPUQuantizationParametersPropagationPass::ResetScale(
     if (!op_node->IsStmt()) continue;
     auto op_info = op_node->AsStmt().mutable_op_info();
     auto op_type = op_info->Type();
-    if (!xpu_general_int8_op_types_.count(op_type)) continue;
+    // if (!xpu_general_int8_op_types_.count(op_type)) continue;
 
     int bit_length = 8;  // op_info->GetAttr<int>("bit_length");
     int range = (1 << (bit_length - 1)) - 1;

@@ -163,14 +163,14 @@ class XPUFcFuser : public FuseBase {
 
       op_desc.SetAttr<std::vector<float>>(
           "Input0_scale",
-          {127 *
-           matched.at("mul")->stmt()->op_info()->GetInputScale(
-               matched.at("x")->arg()->name)[0]});
+          {matched.at("mul")->stmt()->op_info()->GetInputScale(
+              matched.at("x")->arg()->name)[0]});
       // don't need * 127
       op_desc.SetAttr<std::vector<float>>(
           "Output0_scale",
           {matched.at("mul")->stmt()->op_info()->GetAttr<float>(
-              "out_threshold")});
+               "out_threshold") /
+           127});
     }
 
     // conv2d int16
