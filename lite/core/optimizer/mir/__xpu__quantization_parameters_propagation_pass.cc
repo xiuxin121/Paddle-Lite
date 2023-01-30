@@ -392,6 +392,7 @@ void XPUQuantizationParametersPropagationPass::Apply(
   SetOutScaleFromCurOutThreshold(graph);
   // (d) Complete the input scale from the output scale of its producer op.
   SetInScaleFromPrevOutScale(graph);
+  // SetOutScaleFromNextInScale(graph, 3);
   ResetScale(graph);
   // (e) Complete the output scale according to the input scale, or complete
   // the

@@ -174,11 +174,21 @@ class XPUFcFuser : public FuseBase {
         out_op_name = "mul";
       }
 
-      op_desc.SetAttr<std::vector<float>>("Output0_scale",
-                                          {matched.at(out_op_name)
-                                               ->stmt()
-                                               ->op_info()
-                                               ->GetOutputScale(output_name)});
+      float out_scale = 0;
+      if (matched.at(out_op_name)
+              ->stmt()
+              ->op_info()
+              ->HasOutputScale(output_name)) {
+        out_scale = matched.at(out_op_name)
+                        ->stmt()
+                        ->op_info()
+                        ->GetOutputScale(output_name)[0];
+      } else {
+        VLOG(1) << "We default set out_scale=0,thanks to there is not out "
+                   "scale value in this op.";
+      }
+
+      op_desc.SetAttr<std::vector<float>>("Output0_scale", {out_scale});
     }
 
     // TODO(quwei):refactor in order to Conform to the new format.

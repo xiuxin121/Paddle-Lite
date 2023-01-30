@@ -578,25 +578,37 @@ class XPUConv2dFuser : public FuseBase {
                  ->GetOutputScale(branch_name)});
       }
 
-      std::string op_name{};
+      std::string out_op_name{};
       if (act_type_ != "linear") {
-        op_name = "act";
+        out_op_name = "act";
       } else if (with_branch_) {
-        op_name = "ew_branch_add";
+        out_op_name = "ew_branch_add";
       } else if (with_bn_) {
-        op_name = "bn";
+        out_op_name = "bn";
       } else if (with_conv_bias_) {
-        op_name = "ew_bias_add";
+        out_op_name = "ew_bias_add";
       } else {
-        op_name = "conv";
+        out_op_name = "conv";
       }
 
       // Set conv2d output max value.(slim provided FP32 precision in
       // out_threshold)
-      op_desc.SetAttr<std::vector<float>>(
-          "Output0_scale",
-          {matched.at(op_name)->stmt()->op_info()->GetOutputScale(
-              output_name)});
+      float out_scale = 0;
+      if (matched.at(out_op_name)
+              ->stmt()
+              ->op_info()
+              ->HasOutputScale(output_name)) {
+        out_scale = matched.at(out_op_name)
+                        ->stmt()
+                        ->op_info()
+                        ->GetOutputScale(output_name)[0];
+
+      } else {
+        VLOG(1) << "We default set out_scale=0,thanks to there is not out "
+                   "scale value in this op.";
+      }
+
+      op_desc.SetAttr<std::vector<float>>("Output0_scale", {out_scale});
     }
 
     // TODO(quwei):refactor in order to Conform to the new format.

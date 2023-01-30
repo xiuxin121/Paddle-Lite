@@ -39,6 +39,11 @@ void XPUConv2dCompute<TGEMM, TW, DX, DY, PType>::PrepareForRun() {
   per_channel_ = param.per_channel;
   CHECK(!(quant_int8 && quant_int16))
       << "param enable_int8 and enable_int16 can't be both true";
+  if (quant_int8 && param.quant_output_max == 0) {
+    CHECK((std::is_same<DY, float>::value))
+        << "when out scale = 0; conv2d output precision must float.";
+  }
+
   if (quant_int8 || quant_int16) {
     input_max_guard_ =
         TargetWrapperXPU::MallocScratchPad(max_ptr_size * sizeof(float));
@@ -189,8 +194,11 @@ void XPUConv2dCompute<TGEMM, TW, DX, DY, PType>::Run() {
                              : nullptr);
   // output_max,branch_maxs only set  when use int8.
   float* output_max =
-      quant_int8 ? reinterpret_cast<float*>(output_max_guard_->addr_)
-                 : param.output_max->template mutable_data<float>(TARGET(kXPU));
+      quant_int8
+          ? param.quant_output_max
+                ? reinterpret_cast<float*>(output_max_guard_->addr_)
+                : nullptr
+          : param.output_max->template mutable_data<float>(TARGET(kXPU));
   float* branch_max = (quant_int8 && (param.quant_branch_max != 0))
                           ? reinterpret_cast<float*>(branch_max_guard_->addr_)
                           : nullptr;

@@ -39,6 +39,11 @@ void XPUFcCompute<TGEMM, TW, DX, DY, PType>::PrepareForRun() {
   quant_int16_ = param.enable_int16;
   CHECK(!(enable_int8_ && quant_int16_))
       << "param enable_int8 and enable_int16 can't be both true";
+  if (enable_int8_ && param.quant_output_max == 0) {
+    CHECK((std::is_same<DY, float>::value))
+        << "when out scale = 0; conv2d output precision must float.";
+  }
+
   // max
   int max_ptr_size = ctx.GetRawContext()->max_ptr_size();
   input_max_guard_ =
@@ -60,6 +65,7 @@ void XPUFcCompute<TGEMM, TW, DX, DY, PType>::PrepareForRun() {
                                        cpu_output_max.data(),
                                        sizeof(float) * max_ptr_size,
                                        IoDirection::HtoD);
+
     if (per_channel_) {
       weight_one_value_guard_ =
           TargetWrapperXPU::MallocScratchPad(max_ptr_size * sizeof(float));
@@ -156,7 +162,9 @@ void XPUFcCompute<TGEMM, TW, DX, DY, PType>::Run() {
 
   float* output_max =
       enable_int8_
-          ? reinterpret_cast<float*>(output_max_guard_->addr_)
+          ? param.quant_output_max
+                ? reinterpret_cast<float*>(output_max_guard_->addr_)
+                : nullptr
           : param.output_max->template mutable_data<float>(TARGET(kXPU));
   const auto* bias =
       param.has_bias ? param.bias->template data<float>() : nullptr;
