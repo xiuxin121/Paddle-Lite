@@ -164,14 +164,24 @@ class XPUFcFuser : public FuseBase {
           "Input0_scale",
           {matched.at("mul")->stmt()->op_info()->GetInputScale(
               matched.at("x")->arg()->name)[0]});
-      // don't need * 127
-      op_desc.SetAttr<std::vector<float>>(
-          "Output0_scale",
-          {matched.at("mul")->stmt()->op_info()->GetAttr<float>(
-               "out_threshold") /
-           127});
+
+      std::string out_op_name{};
+      if (act_type_ != "linear") {
+        out_op_name = "act";
+      } else if (with_bias_) {
+        out_op_name = "add";
+      } else {
+        out_op_name = "mul";
+      }
+
+      op_desc.SetAttr<std::vector<float>>("Output0_scale",
+                                          {matched.at(out_op_name)
+                                               ->stmt()
+                                               ->op_info()
+                                               ->GetOutputScale(output_name)});
     }
 
+    // TODO(quwei):refactor in order to Conform to the new format.
     // conv2d int16
     if (matched.at("mul")->stmt()->op_info()->HasAttr("enable_int16") &&
         matched.at("mul")->stmt()->op_info()->GetAttr<bool>("enable_int16")) {

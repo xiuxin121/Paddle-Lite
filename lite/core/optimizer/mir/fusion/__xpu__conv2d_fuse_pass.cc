@@ -415,7 +415,7 @@ class XPUConv2dFuser : public FuseBase {
         for (int i = 0; i < mean_len; ++i) {
           scale_on_host[i] = scale_on_host[i] / sqrtf(var_on_host[i] + epsilon);
         }
-        // FP32 kernel： reset Weight value.s
+        // FP32 kernel： reset Weight value.
         auto op_desc_origin = *matched.at("conv")->stmt()->op_info();
         if (!(op_desc_origin.HasAttr("enable_int8") &&
               op_desc_origin.GetAttr<bool>("enable_int8"))) {
@@ -543,10 +543,6 @@ class XPUConv2dFuser : public FuseBase {
         return scale_name;
       };
 
-      // Set conv2d input max value,thanks to at quant_dequant_fuse_pass:
-      // scale_value = InScale/127 ,but in xpu conv2d int8 compute, we need
-      // origin InScale(slim provided FP32 precision),so we should
-      // scale_value*127 in there.
       op_desc.SetAttr<std::vector<float>>(
           get_scale_name(input_name),
           {matched.at("conv")->stmt()->op_info()->GetInputScale(
@@ -556,12 +552,6 @@ class XPUConv2dFuser : public FuseBase {
       auto max_weight_vector =
           matched.at("conv")->stmt()->op_info()->GetInputScale(filter_name);
 
-      // Weight is already int8 preision after quant_dequant_fuse_pass. we only
-      // need set conv2d weight max value in there.
-      // quant_dequant_fuse_pass:weight_scale =
-      // channel_scale_data/127 ,but in xpu conv2d int8 compute, we need origin
-      // channel_scale_data(slim provided FP32 precision),so we should
-      // weight_scale*127 in there.
       if (is_per_tensor(max_weight_vector)) {
         per_channel = false;
         VLOG(4) << "xpu conv quant weight only use one  max value. ";
@@ -578,8 +568,6 @@ class XPUConv2dFuser : public FuseBase {
       op_desc.SetAttr<std::vector<float>>(get_scale_name(filter_name),
                                           weight_max);
 
-      // conv2d branch  max value,x is set by the out_threshold value which
-      // ementwise_add previous op provided.(slim provided FP32 precision)
       if (with_branch_) {
         std::string branch_name = matched.at("ew_branch_add_in")->arg()->name;
         op_desc.SetAttr<std::vector<float>>(
@@ -587,8 +575,7 @@ class XPUConv2dFuser : public FuseBase {
             {(matched.at("ew_branch_add_in")->inlinks.front())
                  ->stmt()
                  ->op_info()
-                 ->GetAttr<float>("out_threshold") /
-             127});
+                 ->GetOutputScale(branch_name)});
       }
 
       std::string op_name{};
@@ -608,15 +595,11 @@ class XPUConv2dFuser : public FuseBase {
       // out_threshold)
       op_desc.SetAttr<std::vector<float>>(
           "Output0_scale",
-          {matched.at(op_name)->stmt()->op_info()->GetAttr<float>(
-               "out_threshold") /
-           127});
-      op_desc.SetAttr<float>(
-          "out_threshold",
-          matched.at(op_name)->stmt()->op_info()->GetAttr<float>(
-              "out_threshold"));
+          {matched.at(op_name)->stmt()->op_info()->GetOutputScale(
+              output_name)});
     }
 
+    // TODO(quwei):refactor in order to Conform to the new format.
     // set conv2d int16 attributes
     if (matched.at("conv")->stmt()->op_info()->HasAttr("enable_int16") &&
         matched.at("conv")->stmt()->op_info()->GetAttr<bool>("enable_int16")) {

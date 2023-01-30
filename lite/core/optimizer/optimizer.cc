@@ -147,6 +147,7 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        // quantized ops are inferred by the propagation method according to the
        // input scales and out_threashold.
        "quantization_parameters_propagation_pass",
+       "__xpu__quantization_parameters_propagation_pass",
        // Based on the custom mixed precision configuration information, remove
        // the quantization parameters of some quantized ops to force them to run
        // at fp32 precision.
@@ -216,7 +217,6 @@ std::unique_ptr<RuntimeProgram> RunDefaultOptimizer(
        "__xpu__dynamic_lstm_fuse_pass",
        "__xpu__multi_softmax_fuse_pass",
        "__xpu__conv2d_transpose_fuse_pass",
-       "__xpu__quantization_parameters_propagation_pass",
        // pick original kernel from graph (exclude xpu)
        "static_kernel_pick_pass",
        // xpu pick original kernel from graph

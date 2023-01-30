@@ -286,6 +286,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                           const lite::KernelBase& kernel,
                           bool* type_match,
                           size_t* score);
+  void SetEnableInt8Attribute(const std::unique_ptr<SSAGraph>& graph);
 
  private:
   core::KernelPickFactor kernel_pick_factors_;

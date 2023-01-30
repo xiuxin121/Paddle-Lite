@@ -76,6 +76,10 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
     }
   }
 
+  if (xpu_use_int8_optimizer_) {
+    SetEnableInt8Attribute(graph);
+  }
+
   // sort kernels by the factors.
   VLOG(2) << "graph block_idx: " << graph->blockIdx();
   VLOG(2) << "graph->mutable_nodes().size(): " << graph->mutable_nodes().size();
@@ -882,6 +886,34 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
   }
 
   return;
+}
+
+// Only pick some ops for  int8 compute in XPU.
+// Op pick int8 kernel in XPU, when has enable_int8 attribute.
+void XPUStaticKernelPickPass::SetEnableInt8Attribute(
+    const std::unique_ptr<SSAGraph>& graph) {
+  for (auto& op_node : graph->StmtTopologicalOrder()) {
+    if (!op_node->IsStmt()) continue;
+    auto cur_op_info = op_node->AsStmt().mutable_op_info();
+    auto op_type = cur_op_info->Type();
+    if (!xpu_int8_general_op_.count(op_type)) continue;
+
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      if (in_var_node->inlinks.empty()) continue;
+      for (auto iter_node = in_var_node->inlinks.begin();
+           iter_node != in_var_node->inlinks.end();
+           iter_node++) {
+        if (!(*iter_node)->IsStmt()) continue;
+        auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+        if (pre_op_info->HasAttr("enable_int8") &&
+            pre_op_info->GetAttr<bool>("enable_int8")) {
+          cur_op_info->SetAttr<bool>("enable_int8", true);
+          break;
+        }
+      }
+    }
+  }
 }
 
 }  // namespace mir

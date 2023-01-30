@@ -24,7 +24,6 @@ namespace mir {
 class XPUQuantizationParametersPropagationPass : public mir::StmtPass {
  public:
   void Apply(const std::unique_ptr<SSAGraph>& graph) override;
-  void SetEnableInt8Attribute(const std::unique_ptr<SSAGraph>& graph);
   void ResetScale(const std::unique_ptr<SSAGraph>& graph);
 
  private:

@@ -331,41 +331,12 @@ static void PrintVariablesWithoutOutScale(
   VLOG(5) << "\nVariables without outscale:\n" << os.str();
 }
 
-// Only pick some ops for  int8 compute in XPU.
-// Op pick int8 kernel in XPU, when has enable_int8 attribute.
-void XPUQuantizationParametersPropagationPass::SetEnableInt8Attribute(
-    const std::unique_ptr<SSAGraph>& graph) {
-  for (auto& op_node : graph->StmtTopologicalOrder()) {
-    if (!op_node->IsStmt()) continue;
-    auto cur_op_info = op_node->AsStmt().mutable_op_info();
-    auto op_type = cur_op_info->Type();
-    if (!xpu_general_int8_op_types_.count(op_type)) continue;
-
-    for (auto in_var_node : op_node->inlinks) {
-      CHECK(in_var_node->IsArg());
-      if (in_var_node->inlinks.empty()) continue;
-      for (auto iter_node = in_var_node->inlinks.begin();
-           iter_node != in_var_node->inlinks.end();
-           iter_node++) {
-        if (!(*iter_node)->IsStmt()) continue;
-        auto op_info = (*iter_node)->AsStmt().mutable_op_info();
-        if (op_info->HasAttr("enable_int8") &&
-            op_info->GetAttr<bool>("enable_int8")) {
-          cur_op_info->SetAttr<bool>("enable_int8", true);
-          break;
-        }
-      }
-    }
-  }
-}
-
 void XPUQuantizationParametersPropagationPass::ResetScale(
     const std::unique_ptr<SSAGraph>& graph) {
   for (auto& op_node : graph->StmtTopologicalOrder()) {
     if (!op_node->IsStmt()) continue;
     auto op_info = op_node->AsStmt().mutable_op_info();
     auto op_type = op_info->Type();
-    // if (!xpu_general_int8_op_types_.count(op_type)) continue;
 
     int bit_length = 8;  // op_info->GetAttr<int>("bit_length");
     int range = (1 << (bit_length - 1)) - 1;
@@ -409,8 +380,8 @@ void XPUQuantizationParametersPropagationPass::Apply(
   // (a) Complete the output scale from the input scale of its consumer ops.
   // SetOutScaleFromNextInScale(graph, auto_complete_quant_scale_level);
 
-  // (b) Complete the output scale from the user-defined configurations.
-  // auto auto_complete_quant_scale_configs =
+  // (b) Complete the output scale from the user -
+  //     defined configurations.auto auto_complete_quant_scale_configs =
   //     GetConfigsFromEnv(QUANT_AUTO_COMPLETE_SCALE_CONFIG_FILE,
   //                       QUANT_AUTO_COMPLETE_SCALE_CONFIG_BUFFER);
   // if (!auto_complete_quant_scale_configs.empty()) {
@@ -421,6 +392,7 @@ void XPUQuantizationParametersPropagationPass::Apply(
   SetOutScaleFromCurOutThreshold(graph);
   // (d) Complete the input scale from the output scale of its producer op.
   SetInScaleFromPrevOutScale(graph);
+  ResetScale(graph);
   // (e) Complete the output scale according to the input scale, or complete
   // the
   // input scale according to the output scale, because the input scale and
@@ -479,8 +451,6 @@ void XPUQuantizationParametersPropagationPass::Apply(
   //   } while (found);
   // }
 
-  SetEnableInt8Attribute(graph);
-  ResetScale(graph);
   // Print variables without outscale to help users set out threshold
   // manually
   PrintVariablesWithoutOutScale(graph);
