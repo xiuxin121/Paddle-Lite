@@ -142,6 +142,7 @@ struct InterpolateParam : ParamBase {
   bool version_2{false};
   std::string interp_method{"Nearest"};
   DataLayoutType data_layout{DATALAYOUT(kNCHW)};
+  WITH_INT8_CONFIG
 };
 
 // For Mul Op
