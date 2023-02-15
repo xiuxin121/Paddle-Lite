@@ -103,6 +103,12 @@ bool ReduceOp::AttachImpl(const cpp::OpDesc &opdesc, lite::Scope *scope) {
   if (opdesc.HasAttr("keep_dim")) {
     param_.keep_dim = opdesc.GetAttr<bool>("keep_dim");
   }
+
+#ifdef LITE_WITH_XPU
+  if (opdesc.HasAttr("enable_int8") && opdesc.GetAttr<bool>("enable_int8")) {
+    param_.enable_int8 = true;
+  }
+#endif
   return true;
 }
 
