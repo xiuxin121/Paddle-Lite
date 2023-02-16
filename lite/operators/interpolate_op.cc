@@ -135,10 +135,10 @@ bool InterpolateOp::AttachImpl(const cpp::OpDesc& op_desc, lite::Scope* scope) {
   param_.interp_method = op_desc.GetAttr<std::string>("interp_method");
 
 #ifdef LITE_WITH_XPU
-  if (op_desc.HasAttr("Out0_scale") && op_desc.HasAttr("Input0_scale")) {
+  if (op_desc.HasAttr("enable_int8") && op_desc.GetAttr("enable_int8")) {
       param_.enable_int8 = true;
       param_.output_scale = op_desc.GetAttr<float>("Out0_scale");
-      param_.input_scale = op_desc.GetAttr<float>("Input0_scale");
+      param_.input_scale = op_desc.GetAttr<float>("X0_scale");
   }
 #endif
 

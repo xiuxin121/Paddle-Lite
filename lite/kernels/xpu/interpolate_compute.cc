@@ -343,6 +343,8 @@ REGISTER_LITE_KERNEL(nearest_interp_v2,
                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
     .BindInput("SizeTensor",
                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kInt32))})
-    .BindInput("Scale", {LiteType::GetTensorTy(TARGET(kHost))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
+    .BindInput("Scale",
+               {LiteType::GetTensorTy(TARGET(kHost))})
+    .BindOutput("Out",
+               {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
     .Finalize();
