@@ -377,5 +377,6 @@ REGISTER_LITE_KERNEL(slice, kXPU, kInt8, kAny, SliceInt8, array_int8)
                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kAny))})
     .BindInput("EndsTensorList",
                {LiteType::GetTensorTy(TARGET(kHost), PRECISION(kAny))})
-    .BindOutput("Out", {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
+    .BindOutput("Out",
+               {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
     .Finalize();
