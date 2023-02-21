@@ -89,7 +89,7 @@ struct ReduceMeanFunctor<int8_t> {
                                     xshape[1],
                                     xshape[2],
                                     xshape[3],
-                                    {xshape[2]},
+                                    {xshape[2], xshape[3]},
                                     {1},
                                     {0},
                                     true,
@@ -213,7 +213,6 @@ void ReduceCompute<T, Functor, PType>::Run() {
                        quant_y_max);
     CHECK_EQ(ret, 0);
   } else {
-    CHECK_EQ(x_shape[2], x_shape[3]);
     quant_x_max = reinterpret_cast<float*>(quant_x_max_value_guard_->addr_);
     quant_y_max = reinterpret_cast<float*>(quant_out_max_value_guard_->addr_);
     int ret = elt_func(ctx.GetRawContext(),

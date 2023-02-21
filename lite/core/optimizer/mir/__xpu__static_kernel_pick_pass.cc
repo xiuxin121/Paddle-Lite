@@ -116,13 +116,15 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
     for (auto&& kernel : instruct.kernels()) {
       VLOG(2) << "current candidate kernel is: " << kernel->summary();
       VLOG(2) << "valid_places size is: " << graph->valid_places().size();
-      if (instruct.op_info()->HasAttr("enable_int8") &&
-          instruct.op_info()->GetAttr<bool>("enable_int8") &&
-          kernel->precision() != PrecisionType::kInt8 &&
-          instruct.op_type() != "__xpu__multi_encoder") {
-        VLOG(6) << "Ignore current kernel: " << kernel->summary()
-                << ", because we only want to pick int8 precision kernel.";
-        continue;
+      if (!xpu_disable_int_op_.count(instruct.op_type())) {
+        if (instruct.op_info()->HasAttr("enable_int8") &&
+            instruct.op_info()->GetAttr<bool>("enable_int8") &&
+            kernel->precision() != PrecisionType::kInt8 &&
+            instruct.op_type() != "__xpu__multi_encoder") {
+          VLOG(6) << "Ignore current kernel: " << kernel->summary()
+                  << ", because we only want to pick int8 precision kernel.";
+          continue;
+        }
       }
 
       float score = KernelGrade(node,
@@ -911,7 +913,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
         }
       }
 
-      // Tem add for ppyolo.
+      // Temp add for ppyolo.
       if (op_type == "concat") {
         for (auto out_var_node : op_node->outlinks) {
           CHECK(out_var_node->IsArg());

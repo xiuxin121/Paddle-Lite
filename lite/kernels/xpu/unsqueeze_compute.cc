@@ -20,8 +20,9 @@ namespace lite {
 namespace kernels {
 namespace xpu {
 
-void UnsqueezeCompute::Run() {
-  auto& param = Param<operators::UnsqueezeParam>();
+template <PrecisionType PType>
+void UnsqueezeCompute<PType>::Run() {
+  auto& param = this->template Param<operators::UnsqueezeParam>();
   auto& ctx = this->ctx_->template As<XPUContext>();
   auto x = param.X;
   auto output = param.Out;
@@ -30,9 +31,9 @@ void UnsqueezeCompute::Run() {
     output->ShareDataWith(*x);
   } else {
     output->set_precision(x->precision());
-    output->mutable_data(TARGET(kXPU), x->memory_size());
+    output->template mutable_data(TARGET(kXPU), x->memory_size());
     int r = xdnn::copy<int8_t>(ctx.GetRawContext(),
-                               x->data<int8_t>(),
+                               x->template data<int8_t>(),
                                static_cast<int8_t*>(output->raw_data()),
                                x->memory_size());
     CHECK_EQ(r, 0);
@@ -45,12 +46,13 @@ void UnsqueezeCompute::Run() {
 }  // namespace lite
 }  // namespace paddle
 
-REGISTER_LITE_KERNEL(unsqueeze,
-                     kXPU,
-                     kAny,
-                     kAny,
-                     paddle::lite::kernels::xpu::UnsqueezeCompute,
-                     def)
+REGISTER_LITE_KERNEL(
+    unsqueeze,
+    kXPU,
+    kAny,
+    kAny,
+    paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kAny)>,
+    def)
     .BindInput("X",
                {LiteType::GetTensorTy(
                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
@@ -65,12 +67,58 @@ REGISTER_LITE_KERNEL(unsqueeze,
                     TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
     .Finalize();
 
-REGISTER_LITE_KERNEL(unsqueeze2,
-                     kXPU,
-                     kAny,
-                     kAny,
-                     paddle::lite::kernels::xpu::UnsqueezeCompute,
-                     def)
+REGISTER_LITE_KERNEL(
+    unsqueeze,
+    kXPU,
+    kInt8,
+    kAny,
+    paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kInt8)>,
+    def_int8)
+    .BindInput("X",
+               {LiteType::GetTensorTy(
+                   TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
+    .BindInput("AxesTensor",
+               {LiteType::GetTensorTy(
+                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
+    .BindInput("AxesTensorList",
+               {LiteType::GetTensorTy(
+                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
+    .BindOutput("Out",
+                {LiteType::GetTensorTy(
+                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
+    .Finalize();
+
+REGISTER_LITE_KERNEL(
+    unsqueeze2,
+    kXPU,
+    kAny,
+    kAny,
+    paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kAny)>,
+    def)
+    .BindInput("X",
+               {LiteType::GetTensorTy(
+                   TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
+    .BindInput("AxesTensor",
+               {LiteType::GetTensorTy(
+                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
+    .BindInput("AxesTensorList",
+               {LiteType::GetTensorTy(
+                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
+    .BindOutput("Out",
+                {LiteType::GetTensorTy(
+                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
+    .BindOutput("XShape",
+                {LiteType::GetTensorTy(
+                    TARGET(kHost), PRECISION(kAny), DATALAYOUT(kAny), -1)})
+    .Finalize();
+
+REGISTER_LITE_KERNEL(
+    unsqueeze2,
+    kXPU,
+    kInt8,
+    kAny,
+    paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kInt8)>,
+    def_int8)
     .BindInput("X",
                {LiteType::GetTensorTy(
                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
