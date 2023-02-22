@@ -747,7 +747,8 @@ void XPUStaticKernelPickPass::SliceForceNotUseXPU(
          iter_node != in_var_node->inlinks.end();
          iter_node++) {
       if (!(*iter_node)->IsStmt()) continue;
-      if ((*iter_node)->AsStmt().op_type() == "shape") {
+      if (((*iter_node)->AsStmt().op_type() == "shape") &&
+          (kernel.place().target == TARGET(kXPU))) {
         *score = 0;
       }
     }
