@@ -735,6 +735,25 @@ void XPUStaticKernelPickPass::SpecialOpScore(lite::mir::Node* node,
   *score += score_tmp_all;
 }
 
+void XPUStaticKernelPickPass::SliceForceNotUseXPU(
+    lite::mir::Node* node,
+    const lite::KernelBase& kernel,
+    bool* type_match,
+    size_t* score) {
+  for (auto in_var_node : node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    if (in_var_node->inlinks.empty()) continue;
+    for (auto iter_node = in_var_node->inlinks.begin();
+         iter_node != in_var_node->inlinks.end();
+         iter_node++) {
+      if (!(*iter_node)->IsStmt()) continue;
+      if ((*iter_node)->AsStmt().op_type() == "shape") {
+        *score = 0;
+      }
+    }
+  }
+}
+
 void XPUStaticKernelPickPass::GeneralInt8OpScore(lite::mir::Node* node,
                                                  const lite::KernelBase& kernel,
                                                  bool* type_match,
@@ -824,6 +843,10 @@ void XPUStaticKernelPickPass::GradeXPUKernelScore(
       GeneralInt8OpScore(node, kernel, type_match, score);
       return;
     }
+  }
+
+  if (instruct.op_type() == "slice") {
+    SliceForceNotUseXPU(node, kernel, type_match, score);
   }
 
   // kernel compute precision:fp32(int16),data precicion:fp32

@@ -297,6 +297,10 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                           bool* type_match,
                           size_t* score);
   void SetEnableInt8Attribute(const std::unique_ptr<SSAGraph>& graph);
+  void SliceForceNotUseXPU(lite::mir::Node* node,
+                           const lite::KernelBase& kernel,
+                           bool* type_match,
+                           size_t* score);
 
  private:
   core::KernelPickFactor kernel_pick_factors_;
