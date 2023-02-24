@@ -938,7 +938,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       }
 
       // Temp add for ppyolo.
-      if (op_type == "concat") {
+      if (op_type == "concat" || op_type == "split") {
         for (auto out_var_node : op_node->outlinks) {
           CHECK(out_var_node->IsArg());
           auto out_var_name = out_var_node->arg()->name;
