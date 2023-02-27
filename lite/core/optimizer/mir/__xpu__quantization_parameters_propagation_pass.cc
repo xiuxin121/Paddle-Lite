@@ -377,6 +377,32 @@ void XPUQuantizationParametersPropagationPass::ResetConcatInlinkOPScale(
       continue;
     }
 
+    bool enbale_int8 = true;
+    // if concat producer has more than one output,concat op not use int8
+    // pricision.
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      auto in_var_name = in_var_node->arg()->name;
+
+      if (in_var_node->inlinks.empty()) continue;
+      for (auto iter_node = in_var_node->inlinks.begin();
+           iter_node != in_var_node->inlinks.end();
+           iter_node++) {
+        if (!(*iter_node)->IsStmt()) continue;
+
+        for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
+          CHECK(preinlik_op_out_var_node->IsArg());
+          if (preinlik_op_out_var_node->outlinks.size() > 1) {
+            enbale_int8 = false;
+          }
+        }
+      }
+    }
+
+    if (!enbale_int8) {
+      continue;
+    }
+
     float out_var_scale = 0;
     for (auto out_var_node : op_node->outlinks) {
       CHECK(out_var_node->IsArg());
@@ -434,14 +460,16 @@ void XPUQuantizationParametersPropagationPass::ResetConcatInlinkOPScale(
 void XPUQuantizationParametersPropagationPass::Apply(
     const std::unique_ptr<SSAGraph>& graph) {
   VLOG(5) << "\n" << Visualize(graph.get());
-  // Due to various reasons (such as bugs from PaddleSlim), some ops in the
+  // Due to various reasons (such as bugs from PaddleSlim), some ops in
+  // the
   // model lack quantization parameters. Optionally, the missing
   // quantization
   // parameters can be completed by the following rules.
 
   auto auto_complete_quant_scale_level =
       GetIntFromEnv(QUANT_AUTO_COMPLETE_SCALE_LEVEL);
-  // (a) Complete the output scale from the input scale of its consumer ops.
+  // (a) Complete the output scale from the input scale of its consumer
+  // ops.
   SetOutScaleFromNextInScale(graph, auto_complete_quant_scale_level);
 
   // (b) Complete the output scale from the user -
@@ -456,7 +484,8 @@ void XPUQuantizationParametersPropagationPass::Apply(
   // (c) Complete the output scale from its out_threshold attribute.
   SetOutScaleFromCurOutThreshold(graph);
 
-  // (d) Complete the input scale from the output scale of its producer op.
+  // (d) Complete the input scale from the output scale of its producer
+  // op.
   SetInScaleFromPrevOutScale(graph);
 
   // (e) Reset all scale(* 127) in xpu op.
@@ -465,8 +494,10 @@ void XPUQuantizationParametersPropagationPass::Apply(
   // (f) Reset output scale of concat consumer ops.
   ResetConcatInlinkOPScale(graph);
 
-  // (g) Complete the output scale according to the input scale, or complete
-  // the input scale according to the output scale, because the input scale and
+  // (g) Complete the output scale according to the input scale, or
+  // complete
+  // the input scale according to the output scale, because the input
+  // scale and
   // output scale of some ops should be the same.
   const std::unordered_map<std::string,
                            std::unordered_map<std::string, std::string>>
@@ -502,7 +533,8 @@ void XPUQuantizationParametersPropagationPass::Apply(
       SetOutScaleFromNextInScale(graph, auto_complete_quant_scale_level);
     } while (found);
   }
-  // (f) Complete the output scale according to the formula of some special ops
+  // (f) Complete the output scale according to the formula of some
+  // special ops
   // themselves.
   if (auto_complete_quant_scale_level >= 3) {
     SetOutScaleFromSpecialOps(graph);

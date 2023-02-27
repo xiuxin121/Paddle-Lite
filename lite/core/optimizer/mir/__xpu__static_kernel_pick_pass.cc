@@ -45,6 +45,10 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
   // Collect input data precision for each node in the graph
   // Collect XPU op type,which used in fp16/in8;
   DataPrecisionDicide(graph);
+  if (xpu_use_int8_optimizer_) {
+    SetEnableInt8Attribute(graph);
+  }
+
   if (xpu_use_fp16_optimizer_ || xpu_use_int8_optimizer_) {
     CollectXPUSpecialOPType(graph);
     for (auto& node : graph->StmtTopologicalOrder()) {
@@ -54,7 +58,9 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
            xpu_special_op_.count(node->AsStmt().op_type())) ||
           (xpu_use_int8_optimizer_ &&
            (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
-            xpu_int8_general_op_.count(node->AsStmt().op_type())))) {
+            xpu_int8_general_op_.count(node->AsStmt().op_type())) &&
+           (node->AsStmt().mutable_op_info()->HasAttr("enable_int8") &&
+            node->AsStmt().mutable_op_info()->GetAttr<bool>("enable_int8")))) {
         SpecialNodeInputPrecision(node);
         continue;
       }
@@ -65,19 +71,15 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
 
       NodeInputPrecision(node, graph);
     }
-
-    for (auto& node : graph->StmtTopologicalOrder()) {
-      if (!node->IsStmt()) continue;
-      if (xpu_inplace_op_.count(node->AsStmt().op_type()) == 0) {
-        continue;
-      }
-
-      InplaceNodeInputPrecision(node);
-    }
   }
 
-  if (xpu_use_int8_optimizer_) {
-    SetEnableInt8Attribute(graph);
+  for (auto& node : graph->StmtTopologicalOrder()) {
+    if (!node->IsStmt()) continue;
+    if (xpu_inplace_op_.count(node->AsStmt().op_type()) == 0) {
+      continue;
+    }
+
+    InplaceNodeInputPrecision(node);
   }
 
   // sort kernels by the factors.
@@ -950,6 +952,27 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       }
     }
 
+    // Check whether the input and output values are equal.
+    if (op_type == "concat") {
+      float out_scale = 0.0f;
+      if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
+        out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
+            "Out0_scale")[0];
+      }
+
+      for (auto in_var_node : op_node->inlinks) {
+        CHECK(in_var_node->IsArg());
+        auto in_var_name = in_var_node->arg()->name;
+        if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
+          float input_scale =
+              instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
+          if (abs(input_scale - out_scale) > 0.0000001f) {
+            quant_int8 = false;
+          }
+        }
+      }
+    }
+
     if (!quant_int8) {
       instruct.mutable_op_info()->SetAttr<bool>("enable_int8", false);
       auto update_desc = *instruct.mutable_op_info();
@@ -957,6 +980,9 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       continue;
     }
 
+    // Only producer op info has attribute enable_int8,consumer op info cant
+    // set
+    // attribute enable_int8=true;
     for (auto in_var_node : op_node->inlinks) {
       CHECK(in_var_node->IsArg());
       if (in_var_node->inlinks.empty()) continue;
