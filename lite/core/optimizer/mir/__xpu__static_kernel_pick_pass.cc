@@ -54,14 +54,15 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
     for (auto& node : graph->StmtTopologicalOrder()) {
       if (!node->IsStmt()) continue;
 
-      if ((xpu_use_fp16_optimizer_ &&
-           xpu_special_op_.count(node->AsStmt().op_type())) ||
-          (xpu_use_int8_optimizer_ &&
-           (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
-            xpu_int8_general_op_.count(node->AsStmt().op_type())) &&
-           (node->AsStmt().mutable_op_info()->HasAttr("enable_int8") &&
-            node->AsStmt().mutable_op_info()->GetAttr<bool>("enable_int8")))) {
-        SpecialNodeInputPrecision(node);
+      if (xpu_use_fp16_optimizer_ &&
+          xpu_special_op_.count(node->AsStmt().op_type())) {
+        SpecialNodeInputPrecision(node, false, xpu_use_fp16_optimizer_);
+      }
+
+      if (xpu_use_int8_optimizer_ &&
+          (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
+           xpu_int8_general_op_.count(node->AsStmt().op_type()))) {
+        SpecialNodeInputPrecision(node, xpu_use_int8_optimizer_, false);
         continue;
       }
 
@@ -94,8 +95,8 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
 
     std::map<std::string, PrecisionType> in_types;
     std::map<std::string, PrecisionType> out_types;
-    // threse precision info store in __model__ file, if selected fp16 kernel,
-    // the output precision should be changed
+    // these precision info store in __model__ file, if selected fp16 kernel,
+    // the output precision should be changed.
     for (std::list<Node*>::iterator i = node->inlinks.begin();
          i != node->inlinks.end();
          ++i) {
@@ -118,14 +119,16 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
     for (auto&& kernel : instruct.kernels()) {
       VLOG(2) << "current candidate kernel is: " << kernel->summary();
       VLOG(2) << "valid_places size is: " << graph->valid_places().size();
-      if (!xpu_disable_int_op_.count(instruct.op_type())) {
-        if (instruct.op_info()->HasAttr("enable_int8") &&
-            instruct.op_info()->GetAttr<bool>("enable_int8") &&
-            kernel->precision() != PrecisionType::kInt8 &&
-            instruct.op_type() != "__xpu__multi_encoder") {
-          VLOG(6) << "Ignore current kernel: " << kernel->summary()
-                  << ", because we only want to pick int8 precision kernel.";
-          continue;
+      if (!xpu_inplace_op_.count(instruct.op_type())) {
+        if (!xpu_disable_int_op_.count(instruct.op_type())) {
+          if (instruct.op_info()->HasAttr("enable_int8") &&
+              instruct.op_info()->GetAttr<bool>("enable_int8") &&
+              kernel->precision() != PrecisionType::kInt8 &&
+              instruct.op_type() != "__xpu__multi_encoder") {
+            VLOG(6) << "Ignore current kernel: " << kernel->summary()
+                    << ", because we only want to pick int8 precision kernel.";
+            continue;
+          }
         }
       }
 
@@ -172,18 +175,18 @@ void XPUStaticKernelPickPass::DataPrecisionDicide(
     return;
   }
 
-  if (graph->valid_places()[0].precision == PrecisionType::kFP16 &&
-      graph->valid_places()[0].target == TargetType::kXPU) {
-    xpu_use_fp16_optimizer_ = true;
-    VLOG(2) << "XPU auto use data precision: FP16/FP32/INT16 ";
-    return;
-  }
+  for (auto& place : graph->valid_places()) {
+    if (place.precision == PrecisionType::kInt8 &&
+        place.target == TargetType::kXPU) {
+      xpu_use_int8_optimizer_ = true;
+      VLOG(2) << "XPU auto use data precision: FP32/INT8.";
+    }
 
-  if (graph->valid_places()[0].precision == PrecisionType::kInt8 &&
-      graph->valid_places()[0].target == TargetType::kXPU) {
-    xpu_use_int8_optimizer_ = true;
-    VLOG(2) << "XPU auto use data precision: FP16/FP32/INT16/INT8 ";
-    return;
+    if (place.precision == PrecisionType::kFP16 &&
+        place.target == TargetType::kXPU) {
+      xpu_use_fp16_optimizer_ = true;
+      VLOG(2) << "XPU auto use data precision: FP16/FP32.";
+    }
   }
 }
 
@@ -379,9 +382,20 @@ void XPUStaticKernelPickPass::InplaceNodeOutputPrecision(
 
 // Special nodes like conv2d, matmul ; collect input data precision for eatch
 // registry kernel as a candidate set.
-void XPUStaticKernelPickPass::SpecialNodeInputPrecision(lite::mir::Node* node) {
+void XPUStaticKernelPickPass::SpecialNodeInputPrecision(
+    lite::mir::Node* node, const bool collect_int8, const bool collect_fp16) {
   auto& inst = node->AsStmt();
   const auto* op_info = inst.op_info();
+  if (collect_int8) {
+    if (!node->AsStmt().mutable_op_info()->HasAttr("enable_int8")) {
+      return;
+    }
+
+    if (!node->AsStmt().mutable_op_info()->GetAttr<bool>("enable_int8")) {
+      return;
+    }
+  }
+
   for (auto* in_var_node : node->inlinks) {
     CHECK(in_var_node->IsArg());
     auto& var = in_var_node->AsArg();
@@ -398,13 +412,11 @@ void XPUStaticKernelPickPass::SpecialNodeInputPrecision(lite::mir::Node* node) {
 
     std::vector<std::map<std::string, PrecisionType>> kernel_input_type{};
     for (auto&& kernel : inst.kernels()) {
-      if (xpu_use_int8_optimizer_ &&
-          kernel->precision() != PrecisionType::kInt8) {
+      if (collect_int8 && kernel->precision() != PrecisionType::kInt8) {
         continue;
       }
 
-      if (xpu_use_fp16_optimizer_ &&
-          kernel->precision() == PrecisionType::kInt8) {
+      if (collect_fp16 && kernel->precision() == PrecisionType::kInt8) {
         continue;
       }
 
@@ -929,6 +941,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
     }
 
     bool quant_int8 = true;
+    // Decide the enable_int8 attribute of general int8 op is true or false.
     if (!xpu_inplace_op_.count(op_type)) {
       for (auto in_var_node : op_node->inlinks) {
         CHECK(in_var_node->IsArg());
@@ -939,7 +952,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
         }
       }
 
-      // Temp add for ppyolo.
+      // Owing to slim bug,this stategy added for ppyolo.
       if (op_type == "concat" || op_type == "split") {
         for (auto out_var_node : op_node->outlinks) {
           CHECK(out_var_node->IsArg());
@@ -952,7 +965,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       }
     }
 
-    // Check whether the input and output values are equal.
+    // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat") {
       float out_scale = 0.0f;
       if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
@@ -980,9 +993,8 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       continue;
     }
 
-    // Only producer op info has attribute enable_int8,consumer op info cant
-    // set
-    // attribute enable_int8=true;
+    // Only producer op has attribute enable_int8,consumer op can
+    // set the attribute of enable_int8 to true;
     for (auto in_var_node : op_node->inlinks) {
       CHECK(in_var_node->IsArg());
       if (in_var_node->inlinks.empty()) continue;

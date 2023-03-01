@@ -68,57 +68,12 @@ REGISTER_LITE_KERNEL(
     .Finalize();
 
 REGISTER_LITE_KERNEL(
-    unsqueeze,
-    kXPU,
-    kInt8,
-    kAny,
-    paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kInt8)>,
-    def_int8)
-    .BindInput("X",
-               {LiteType::GetTensorTy(
-                   TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
-    .BindInput("AxesTensor",
-               {LiteType::GetTensorTy(
-                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
-    .BindInput("AxesTensorList",
-               {LiteType::GetTensorTy(
-                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
-    .BindOutput("Out",
-                {LiteType::GetTensorTy(
-                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
-    .Finalize();
-
-REGISTER_LITE_KERNEL(
     unsqueeze2,
     kXPU,
     kAny,
     kAny,
     paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kAny)>,
     def)
-    .BindInput("X",
-               {LiteType::GetTensorTy(
-                   TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
-    .BindInput("AxesTensor",
-               {LiteType::GetTensorTy(
-                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
-    .BindInput("AxesTensorList",
-               {LiteType::GetTensorTy(
-                   TARGET(kHost), PRECISION(kInt32), DATALAYOUT(kAny), -1)})
-    .BindOutput("Out",
-                {LiteType::GetTensorTy(
-                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})
-    .BindOutput("XShape",
-                {LiteType::GetTensorTy(
-                    TARGET(kHost), PRECISION(kAny), DATALAYOUT(kAny), -1)})
-    .Finalize();
-
-REGISTER_LITE_KERNEL(
-    unsqueeze2,
-    kXPU,
-    kInt8,
-    kAny,
-    paddle::lite::kernels::xpu::UnsqueezeCompute<PRECISION(kInt8)>,
-    def_int8)
     .BindInput("X",
                {LiteType::GetTensorTy(
                    TARGET(kXPU), PRECISION(kAny), DATALAYOUT(kAny), -1)})

@@ -492,7 +492,7 @@ void XPUQuantizationParametersPropagationPass::Apply(
   ResetScale(graph);
 
   // (f) Reset output scale of concat consumer ops.
-  ResetConcatInlinkOPScale(graph);
+  // ResetConcatInlinkOPScale(graph);
 
   // (g) Complete the output scale according to the input scale, or
   // complete

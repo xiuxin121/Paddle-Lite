@@ -602,10 +602,14 @@ class XPUConv2dFuser : public FuseBase {
                         ->stmt()
                         ->op_info()
                         ->GetOutputScale(output_name)[0];
+        if (out_scale == 0) {
+          VLOG(1) << "output_name:" << output_name;
+        }
 
       } else {
         VLOG(1) << "We default set out_scale=0,thanks to there is not out "
                    "scale value in this op.";
+        VLOG(1) << "output_name:" << output_name;
       }
 
       op_desc.SetAttr<std::vector<float>>("Output0_scale", {out_scale});

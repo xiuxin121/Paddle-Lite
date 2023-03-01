@@ -64,50 +64,12 @@ REGISTER_LITE_KERNEL(
     .Finalize();
 
 REGISTER_LITE_KERNEL(
-    squeeze,
-    kXPU,
-    kInt8,
-    kAny,
-    paddle::lite::kernels::xpu::SqueezeCompute<PRECISION(kInt8)>,
-    def_int8)
-    .BindInput("X",
-               {LiteType::GetTensorTy(TARGET(kXPU),
-                                      PRECISION(kAny),
-                                      DATALAYOUT(kAny))})
-    .BindOutput("Out",
-                {LiteType::GetTensorTy(TARGET(kXPU),
-                                       PRECISION(kAny),
-                                       DATALAYOUT(kAny))})
-    .Finalize();
-
-REGISTER_LITE_KERNEL(
     squeeze2,
     kXPU,
     kAny,
     kAny,
     paddle::lite::kernels::xpu::SqueezeCompute<PRECISION(kAny)>,
     def)
-    .BindInput("X",
-               {LiteType::GetTensorTy(TARGET(kXPU),
-                                      PRECISION(kAny),
-                                      DATALAYOUT(kAny))})
-    .BindOutput("Out",
-                {LiteType::GetTensorTy(TARGET(kXPU),
-                                       PRECISION(kAny),
-                                       DATALAYOUT(kAny))})
-    .BindOutput("XShape",
-                {LiteType::GetTensorTy(TARGET(kXPU),
-                                       PRECISION(kAny),
-                                       DATALAYOUT(kAny))})
-    .Finalize();
-
-REGISTER_LITE_KERNEL(
-    squeeze2,
-    kXPU,
-    kInt8,
-    kAny,
-    paddle::lite::kernels::xpu::SqueezeCompute<PRECISION(kInt8)>,
-    def_int8)
     .BindInput("X",
                {LiteType::GetTensorTy(TARGET(kXPU),
                                       PRECISION(kAny),

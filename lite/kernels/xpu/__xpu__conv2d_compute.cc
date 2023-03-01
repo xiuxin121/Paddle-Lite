@@ -484,3 +484,41 @@ REGISTER_LITE_KERNEL(__xpu__conv2d,
                 {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kFP16))})
     .BindOutput("OutputMax", {LiteType::GetTensorTy(TARGET(kXPU))})
     .Finalize();
+
+using XPUConv2dInt8_Int8_FP16 =
+    xpu::XPUConv2dCompute<int8_t, int8_t, int8_t, float16, PRECISION(kInt8)>;
+REGISTER_LITE_KERNEL(__xpu__conv2d,
+                     kXPU,
+                     kInt8,
+                     kNCHW,
+                     XPUConv2dInt8_Int8_FP16,
+                     XPU_Int8_Int8_FP16)
+    .BindInput("Input", {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
+    .BindInput("Filter", {LiteType::GetTensorTy(TARGET(kHost))})
+    .BindInput("InputMax", {LiteType::GetTensorTy(TARGET(kXPU))})
+    .BindInput("Bias", {LiteType::GetTensorTy(TARGET(kXPU))})
+    .BindInput("Branch",
+               {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kFP16))})
+    .BindOutput("Output",
+                {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kFP16))})
+    .BindOutput("OutputMax", {LiteType::GetTensorTy(TARGET(kXPU))})
+    .Finalize();
+
+using XPUConv2dInt8_FP16_Int8 =
+    xpu::XPUConv2dCompute<int8_t, int8_t, float16, int8_t, PRECISION(kInt8)>;
+REGISTER_LITE_KERNEL(__xpu__conv2d,
+                     kXPU,
+                     kInt8,
+                     kNCHW,
+                     XPUConv2dInt8_FP16_Int8,
+                     XPU_Int8_FP16_Int8)
+    .BindInput("Input", {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kFP16))})
+    .BindInput("Filter", {LiteType::GetTensorTy(TARGET(kHost))})
+    .BindInput("InputMax", {LiteType::GetTensorTy(TARGET(kXPU))})
+    .BindInput("Bias", {LiteType::GetTensorTy(TARGET(kXPU))})
+    .BindInput("Branch",
+               {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
+    .BindOutput("Output",
+                {LiteType::GetTensorTy(TARGET(kXPU), PRECISION(kInt8))})
+    .BindOutput("OutputMax", {LiteType::GetTensorTy(TARGET(kXPU))})
+    .Finalize();

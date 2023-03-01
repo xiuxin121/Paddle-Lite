@@ -263,7 +263,9 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   void NodeInputPrecision(lite::mir::Node* node,
                           const std::unique_ptr<SSAGraph>& graph);
   void InplaceNodeInputPrecision(lite::mir::Node* node);
-  void SpecialNodeInputPrecision(lite::mir::Node* node);
+  void SpecialNodeInputPrecision(lite::mir::Node* node,
+                                 const bool collect_int8,
+                                 const bool collect_fp16);
 
   void NodeOutputPrecision(const std::unique_ptr<SSAGraph>& graph,
                            lite::mir::Node* node);
@@ -324,17 +326,18 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   bool xpu_use_int8_optimizer_{false};
   const std::set<std::string> xpu_int8_special_op_{"__xpu__fc",
                                                    "__xpu__conv2d"};
+  // Owing to slim bug,this op is not support int8 compute.
   const std::set<std::string> xpu_disable_int_op_{"matmul_v2",
                                                   "conv2d_transpose"};
-  const std::set<std::string> xpu_int8_general_op_{"pool2d",
-                                                   "elementwise_add",
-                                                   "elementwise_mul",
-                                                   "concat",
-                                                   "reduce_mean",
-                                                   "bilinear_interp",
-                                                   "bilinear_interp_v2",
-                                                   "nearest_interp",
-                                                   "nearest_interp_v2",
+  const std::set<std::string> xpu_int8_general_op_{// "pool2d",
+                                                   //  "elementwise_add",
+                                                   //  "elementwise_mul",
+                                                   //  //"concat",
+                                                   //  "reduce_mean",
+                                                   //  "bilinear_interp",
+                                                   //  "bilinear_interp_v2",
+                                                   //  "nearest_interp",
+                                                   //  "nearest_interp_v2",
                                                    "transpose",
                                                    "transpose2",
                                                    "split",
