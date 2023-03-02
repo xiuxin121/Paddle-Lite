@@ -299,6 +299,10 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                           bool* type_match,
                           size_t* score);
   void SetEnableInt8Attribute(const std::unique_ptr<SSAGraph>& graph);
+  void strategiesInt8OP(lite::mir::Node* op_node,
+                        paddle::lite::mir::Node::Stmt& instruct,
+                        bool* quant_int8);
+  void strategiesconcatOP(lite::mir::Node* op_node);
   void SliceForceNotUseXPU(lite::mir::Node* node,
                            const lite::KernelBase& kernel,
                            bool* type_match,
@@ -329,15 +333,35 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   // Owing to slim bug,this op is not support int8 compute.
   const std::set<std::string> xpu_disable_int_op_{"matmul_v2",
                                                   "conv2d_transpose"};
-  const std::set<std::string> xpu_int8_general_op_{// "pool2d",
-                                                   //  "elementwise_add",
-                                                   //  "elementwise_mul",
-                                                   //  //"concat",
-                                                   //  "reduce_mean",
-                                                   //  "bilinear_interp",
-                                                   //  "bilinear_interp_v2",
-                                                   //  "nearest_interp",
-                                                   //  "nearest_interp_v2",
+
+  const std::set<std::string> xpu_int8_general_op_not_need_sacale_{
+      "nearest_interp",
+      "nearest_interp_v2",
+      "transpose",
+      "transpose2",
+      "split",
+      "clip",
+      "slice",
+      "shape"};
+
+  const std::set<std::string> xpu_int8_general_op_need_sacale_{
+      "pool2d",
+      "elementwise_add",
+      "elementwise_mul",
+      "concat",
+      "reduce_mean",
+      "bilinear_interp",
+      "bilinear_interp_v2"};
+
+  const std::set<std::string> xpu_int8_general_op_{"pool2d",
+                                                   "elementwise_add",
+                                                   "elementwise_mul",
+                                                   "concat",
+                                                   "reduce_mean",
+                                                   "bilinear_interp",
+                                                   "bilinear_interp_v2",
+                                                   "nearest_interp",
+                                                   "nearest_interp_v2",
                                                    "transpose",
                                                    "transpose2",
                                                    "split",

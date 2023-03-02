@@ -927,8 +927,207 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
   return;
 }
 
+void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node) {
+  bool enbale_int8 = true;
+  auto op_info = op_node->AsStmt().mutable_op_info();
+  //  concat producer has more than one output.
+  for (auto in_var_node : op_node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    auto in_var_name = in_var_node->arg()->name;
+
+    if (in_var_node->inlinks.empty()) continue;
+    for (auto iter_node = in_var_node->inlinks.begin();
+         iter_node != in_var_node->inlinks.end();
+         iter_node++) {
+      if (!(*iter_node)->IsStmt()) continue;
+
+      for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
+        CHECK(preinlik_op_out_var_node->IsArg());
+        if (preinlik_op_out_var_node->outlinks.size() > 1) {
+          enbale_int8 = false;
+        }
+      }
+    }
+  }
+
+  if (!enbale_int8) {
+    return;
+  }
+
+  float out_var_scale = 0;
+  for (auto out_var_node : op_node->outlinks) {
+    CHECK(out_var_node->IsArg());
+    auto out_var_name = out_var_node->arg()->name;
+    if (op_info->HasOutputScale(out_var_name)) {
+      out_var_scale = op_info->GetOutputScale(out_var_name)[0];
+      break;
+    }
+  }
+
+  // Reset intput sclae value
+  if (out_var_scale > 0) {
+    // Reset intput sclae values
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      auto in_var_name = in_var_node->arg()->name;
+      if (!op_info->HasInputScale(in_var_name)) continue;
+      op_info->SetInputScale(in_var_name, {out_var_scale});
+    }
+
+    // Reset pre inlinks op output sclae value
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      auto in_var_name = in_var_node->arg()->name;
+
+      if (in_var_node->inlinks.empty()) continue;
+      for (auto iter_node = in_var_node->inlinks.begin();
+           iter_node != in_var_node->inlinks.end();
+           iter_node++) {
+        if (!(*iter_node)->IsStmt()) continue;
+        auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+
+        for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
+          CHECK(preinlik_op_out_var_node->IsArg());
+          auto out_var_name = preinlik_op_out_var_node->arg()->name;
+          if (in_var_name != out_var_name) {
+            continue;
+          }
+
+          if (pre_op_info->HasOutputScale(out_var_name)) {
+            pre_op_info->SetOutputScale(out_var_name, {out_var_scale});
+            VLOG(4) << "OP type : " << pre_op_info->Type()
+                    << ", origin out sacle is:"
+                    << pre_op_info->GetOutputScale(out_var_name)[0]
+                    << ", Reset out scale is :" << out_var_scale;
+            break;
+          }
+        }
+      }
+    }
+  }
+}
 // Only pick some ops for  int8 compute in XPU.
 // Op pick int8 kernel in XPU, when has enable_int8 attribute.
+void XPUStaticKernelPickPass::strategiesInt8OP(
+    lite::mir::Node* op_node,
+    paddle::lite::mir::Node::Stmt& instruct,
+    bool* quant_int8) {
+  auto op_type = instruct.mutable_op_info()->Type();
+  // Use some strategies to evaluate whether the current OP can use int8
+  // compute.
+
+  // 1.The current op uses int8 to compute without relying on scale.
+  if (xpu_int8_general_op_not_need_sacale_.count(op_type)) {
+    *quant_int8 = true;
+    return;
+  }
+
+  // 2.
+  *quant_int8 = false;
+  for (auto out_var_node : op_node->outlinks) {
+    CHECK(out_var_node->IsArg());
+    if (out_var_node->outlinks.empty()) continue;
+    for (auto iter_node = out_var_node->outlinks.begin();
+         iter_node != out_var_node->outlinks.end();
+         iter_node++) {
+      if (!(*iter_node)->IsStmt()) continue;
+      auto next_op_info = (*iter_node)->AsStmt().mutable_op_info();
+      if (next_op_info->HasAttr("enable_int8") &&
+          next_op_info->GetAttr<bool>("enable_int8")) {
+        *quant_int8 = true;
+        break;
+      }
+    }
+  }
+
+  // Only eatch producer op has attribute enable_int8,consumer op can
+  // set the attribute of enable_int8 to true;
+  if (op_node->inlinks.empty()) {
+    *quant_int8 = false;
+    return;
+  }
+  for (auto in_var_node : op_node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    if (in_var_node->inlinks.empty()) continue;
+    for (auto iter_node = in_var_node->inlinks.begin();
+         iter_node != in_var_node->inlinks.end();
+         iter_node++) {
+      if (!(*iter_node)->IsStmt()) continue;
+      auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+      if (!pre_op_info->HasAttr("enable_int8")) {
+        *quant_int8 = false;
+        break;
+      }
+      if (!pre_op_info->GetAttr<bool>("enable_int8")) {
+        *quant_int8 = false;
+        break;
+      }
+    }
+  }
+
+  if (*quant_int8) {
+    VLOG(1) << "satisfied";
+    return;
+  }
+
+  // 3.If the relative threshold between the input maximum and output maximum of
+  // the current op is less than 10%.
+  *quant_int8 = true;
+  float out_scale = 0.0f;
+  if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
+    out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
+        "Out0_scale")[0];
+  } else {
+    *quant_int8 = false;
+  }
+
+  for (auto in_var_node : op_node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    auto in_var_name = in_var_node->arg()->name;
+    if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
+      float input_scale =
+          instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
+      if (abs((input_scale - out_scale) / out_scale) > 0.1) {
+        *quant_int8 = false;
+        break;
+      }
+    } else {
+      *quant_int8 = false;
+    }
+  }
+  if (*quant_int8) {
+    VLOG(1) << "satisfied";
+    return;
+  }
+
+  // 4.special op ew_add
+
+  if (op_type == "elementwise_add") {
+    out_scale = 0.0f;
+    if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
+      out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
+          "Out0_scale")[0];
+    }
+
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      auto in_var_name = in_var_node->arg()->name;
+      if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
+        float input_scale =
+            instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
+        if (abs((input_scale - out_scale) / out_scale) < 0.1f) {
+          *quant_int8 = true;
+          VLOG(1) << "satisfied";
+          return;
+        }
+      }
+    }
+  }
+
+  // Not satisfied  all current conditions.
+  *quant_int8 = false;
+}
+
 void XPUStaticKernelPickPass::SetEnableInt8Attribute(
     const std::unique_ptr<SSAGraph>& graph) {
   for (auto& op_node : graph->StmtTopologicalOrder()) {
@@ -941,6 +1140,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
     }
 
     bool quant_int8 = true;
+    // wing to slim bug,Temp add.
     // Decide the enable_int8 attribute of general int8 op is true or false.
     if (!xpu_inplace_op_.count(op_type)) {
       for (auto in_var_node : op_node->inlinks) {
@@ -965,8 +1165,18 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       }
     }
 
+    if (!quant_int8) {
+      instruct.mutable_op_info()->SetAttr<bool>("enable_int8", false);
+      auto update_desc = *instruct.mutable_op_info();
+      instruct.ResetOp(update_desc, graph->valid_places());
+      continue;
+    }
+
+    strategiesInt8OP(op_node, instruct, &quant_int8);
+
     // when quant op is concat,the input and output values must be the same.
-    if (op_type == "concat") {
+    if (op_type == "concat" && quant_int8) {
+      strategiesconcatOP(op_node);
       float out_scale = 0.0f;
       if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
         out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
@@ -979,8 +1189,9 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
         if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
           float input_scale =
               instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
-          if (abs(input_scale - out_scale) > 0.0000001f) {
+          if (abs(input_scale - out_scale) > 0.001f) {
             quant_int8 = false;
+            break;
           }
         }
       }
@@ -988,30 +1199,12 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
 
     if (!quant_int8) {
       instruct.mutable_op_info()->SetAttr<bool>("enable_int8", false);
-      auto update_desc = *instruct.mutable_op_info();
-      instruct.ResetOp(update_desc, graph->valid_places());
-      continue;
+    } else {
+      instruct.mutable_op_info()->SetAttr<bool>("enable_int8", true);
     }
-
-    // Only producer op has attribute enable_int8,consumer op can
-    // set the attribute of enable_int8 to true;
-    for (auto in_var_node : op_node->inlinks) {
-      CHECK(in_var_node->IsArg());
-      if (in_var_node->inlinks.empty()) continue;
-      for (auto iter_node = in_var_node->inlinks.begin();
-           iter_node != in_var_node->inlinks.end();
-           iter_node++) {
-        if (!(*iter_node)->IsStmt()) continue;
-        auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
-        if (pre_op_info->HasAttr("enable_int8") &&
-            pre_op_info->GetAttr<bool>("enable_int8")) {
-          instruct.mutable_op_info()->SetAttr<bool>("enable_int8", true);
-          auto update_desc = *instruct.mutable_op_info();
-          instruct.ResetOp(update_desc, graph->valid_places());
-          break;
-        }
-      }
-    }
+    VLOG(1) << "op_type:" << op_type << "quant_int8:" << quant_int8;
+    auto update_desc = *instruct.mutable_op_info();
+    instruct.ResetOp(update_desc, graph->valid_places());
   }
 }
 
