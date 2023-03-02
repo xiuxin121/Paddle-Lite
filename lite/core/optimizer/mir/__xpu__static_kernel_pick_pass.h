@@ -338,7 +338,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
       "nearest_interp",
       "nearest_interp_v2",
       "transpose",
-      "transpose2",
+      //"transpose2",
       "split",
       "clip",
       "slice",
