@@ -1084,9 +1084,12 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
     auto in_var_name = in_var_node->arg()->name;
+    VLOG(1) << "in_var_name:" << in_var_name;
     if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
       float input_scale =
           instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
+      VLOG(1) << "input_scale:" << input_scale;
+      VLOG(1) << "out_scale:" << out_scale;
       if (abs((input_scale - out_scale) / out_scale) > 0.1) {
         *quant_int8 = false;
         break;
@@ -1172,7 +1175,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       continue;
     }
 
-    // strategiesInt8OP(op_node, instruct, &quant_int8);
+    strategiesInt8OP(op_node, instruct, &quant_int8);
 
     // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat" && quant_int8) {
