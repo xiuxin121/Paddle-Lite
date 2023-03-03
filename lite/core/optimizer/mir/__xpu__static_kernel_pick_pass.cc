@@ -1180,7 +1180,8 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
         CHECK(out_var_node->IsArg());
         auto out_var_name = out_var_node->arg()->name;
         if (out_var_name == "concat_16.tmp_0" ||
-            out_var_name == "concat_14.tmp_0") {
+            out_var_name == "concat_14.tmp_0" ||
+            out_var_name == "concat_15.tmp_0") {
           quant_int8 = false;
           break;
         }
