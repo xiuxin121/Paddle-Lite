@@ -83,6 +83,11 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
       encode_precision_ = GetStringFromEnv("XPU_ENCODER_PRECISION");
     }
 #endif
+    xpu_input_type_.clear();
+    xpu_output_type_.clear();
+    xpu_special_op_.clear();
+    xpu_use_int8_optimizer_ = false;
+    xpu_use_fp16_optimizer_ = false;
   }
 
   // Score the kernel.
@@ -326,21 +331,23 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                                                    "__xpu__conv2d"};
   const std::set<std::string> xpu_disable_int_op_{"matmul_v2",
                                                   "conv2d_transpose"};
-  const std::set<std::string> xpu_int8_general_op_{"pool2d",
-                                                   "elementwise_add",
-                                                   "elementwise_mul",
-                                                   "concat",
-                                                   "reduce_mean",
-                                                   "bilinear_interp",
-                                                   "bilinear_interp_v2",
-                                                   "nearest_interp",
-                                                   "nearest_interp_v2",
-                                                   "transpose",
-                                                   "transpose2",
-                                                   "split",
-                                                   "clip",
-                                                   "slice",
-                                                   "shape"};
+  const std::set<std::string> xpu_int8_general_op_{
+      "pool2d",
+      //  "elementwise_add",
+      //  "elementwise_mul",
+      //  "concat",
+      //  "reduce_mean",
+      //  "bilinear_interp",
+      //  "bilinear_interp_v2",
+      //  "nearest_interp",
+      //  "nearest_interp_v2",
+      //  "transpose",
+      //  "transpose2",
+      //  "split",
+      //  "clip",
+      //  "slice",
+      //  "shape"
+  };
 
   bool local_quant_{false};
   std::string encode_precision_;
