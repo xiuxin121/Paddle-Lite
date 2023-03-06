@@ -927,14 +927,29 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
   return;
 }
 
-void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node) {
-  bool enbale_int8 = true;
+void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
+                                                 bool* quant_int8) {
   auto op_info = op_node->AsStmt().mutable_op_info();
-  //  concat producer has more than one output.
+  float cancat_out_scale = 0;
+  std::string cancat_out_var_name;
+  for (auto out_var_node : op_node->outlinks) {
+    CHECK(out_var_node->IsArg());
+    cancat_out_var_name = out_var_node->arg()->name;
+    if (op_info->HasOutputScale(cancat_out_var_name)) {
+      cancat_out_scale = op_info->GetOutputScale(cancat_out_var_name)[0];
+      break;
+    }
+  }
+
+  if (cancat_out_scale <= 0) {
+    *quant_int8 = false;
+    return;
+  }
+
+  // case1.Producer of concat has more than one output.
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
-    auto in_var_name = in_var_node->arg()->name;
-
+    auto concat_in_var_name = in_var_node->arg()->name;
     if (in_var_node->inlinks.empty()) continue;
     for (auto iter_node = in_var_node->inlinks.begin();
          iter_node != in_var_node->inlinks.end();
@@ -943,69 +958,111 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node) {
 
       for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
         CHECK(preinlik_op_out_var_node->IsArg());
+        auto var_name = preinlik_op_out_var_node->arg()->name;
+        if (var_name != concat_in_var_name) {
+          continue;
+        }
+
         if (preinlik_op_out_var_node->outlinks.size() > 1) {
-          enbale_int8 = false;
+          auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+          if (pre_op_info->HasOutputScale(var_name)) {
+            float pre_out_scale = pre_op_info->GetOutputScale(var_name)[0];
+            if (abs(pre_out_scale - cancat_out_scale) / cancat_out_scale >
+                0.1f) {
+              *quant_int8 = false;
+              return;
+            }
+          }
         }
       }
     }
   }
 
-  if (!enbale_int8) {
-    return;
+  // Reset concat input sclae values
+  for (auto in_var_node : op_node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    auto in_var_name = in_var_node->arg()->name;
+    if (!op_info->HasInputScale(in_var_name)) continue;
+    op_info->SetInputScale(in_var_name, {cancat_out_scale});
   }
 
-  float out_var_scale = 0;
-  for (auto out_var_node : op_node->outlinks) {
-    CHECK(out_var_node->IsArg());
-    auto out_var_name = out_var_node->arg()->name;
-    if (op_info->HasOutputScale(out_var_name)) {
-      out_var_scale = op_info->GetOutputScale(out_var_name)[0];
-      break;
-    }
-  }
+  // Reset the out scale ，which the producers of concat.
+  for (auto in_var_node : op_node->inlinks) {
+    CHECK(in_var_node->IsArg());
+    auto concat_in_var_name = in_var_node->arg()->name;
 
-  // Reset intput sclae value
-  if (out_var_scale > 0) {
-    // Reset intput sclae values
-    for (auto in_var_node : op_node->inlinks) {
-      CHECK(in_var_node->IsArg());
-      auto in_var_name = in_var_node->arg()->name;
-      if (!op_info->HasInputScale(in_var_name)) continue;
-      op_info->SetInputScale(in_var_name, {out_var_scale});
-    }
+    if (in_var_node->inlinks.empty()) continue;
+    for (auto iter_node = in_var_node->inlinks.begin();
+         iter_node != in_var_node->inlinks.end();
+         iter_node++) {
+      if (!(*iter_node)->IsStmt()) continue;
+      auto pre_op_type = (*iter_node)->AsStmt().mutable_op_info()->Type();
+      // Reset pre-pre inlinks op output sclae value,if pre inlinks op is
+      // inplace.
+      if (xpu_inplace_op_.count(pre_op_type)) {
+        auto inplace_input_var_node = (*iter_node)->inlinks.front();
+        CHECK(inplace_input_var_node->IsArg());
+        auto inplace_input_var_name = inplace_input_var_node->arg()->name;
+        auto pre_pre_node = inplace_input_var_node->inlinks.front();
+        if (!pre_pre_node->IsStmt()) {
+          continue;
+        }
 
-    // Reset pre inlinks op output sclae value
-    for (auto in_var_node : op_node->inlinks) {
-      CHECK(in_var_node->IsArg());
-      auto in_var_name = in_var_node->arg()->name;
-
-      if (in_var_node->inlinks.empty()) continue;
-      for (auto iter_node = in_var_node->inlinks.begin();
-           iter_node != in_var_node->inlinks.end();
-           iter_node++) {
-        if (!(*iter_node)->IsStmt()) continue;
-        auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
-
-        for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
-          CHECK(preinlik_op_out_var_node->IsArg());
-          auto out_var_name = preinlik_op_out_var_node->arg()->name;
-          if (in_var_name != out_var_name) {
+        auto pre_pre_op_info = pre_pre_node->AsStmt().mutable_op_info();
+        for (auto pre_pre_op_out_var_node : pre_pre_node->outlinks) {
+          CHECK(pre_pre_op_out_var_node->IsArg());
+          auto var_name = pre_pre_op_out_var_node->arg()->name;
+          if (inplace_input_var_name != var_name) {
             continue;
           }
 
-          if (pre_op_info->HasOutputScale(out_var_name)) {
-            pre_op_info->SetOutputScale(out_var_name, {out_var_scale});
-            VLOG(4) << "OP type : " << pre_op_info->Type()
+          if (pre_pre_op_info->HasOutputScale(var_name)) {
+            VLOG(4) << "OP type : " << pre_pre_op_info->Type()
                     << ", origin out sacle is:"
-                    << pre_op_info->GetOutputScale(out_var_name)[0]
-                    << ", Reset out scale is :" << out_var_scale;
+                    << pre_pre_op_info->GetOutputScale(var_name)[0]
+                    << ", Reset out scale is :" << cancat_out_scale;
+            pre_pre_op_info->SetOutputScale(var_name, {cancat_out_scale});
             break;
           }
+        }
+      }
+
+      // Reset pre inlinks op output sclae value
+      auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+      for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
+        CHECK(preinlik_op_out_var_node->IsArg());
+        auto out_var_name = preinlik_op_out_var_node->arg()->name;
+        if (concat_in_var_name != out_var_name) {
+          continue;
+        }
+
+        if (pre_op_info->HasOutputScale(out_var_name)) {
+          VLOG(4) << "OP type : " << pre_op_info->Type()
+                  << ", origin out sacle is:"
+                  << pre_op_info->GetOutputScale(out_var_name)[0]
+                  << ", Reset out scale is :" << cancat_out_scale;
+          pre_op_info->SetOutputScale(out_var_name, {cancat_out_scale});
+          break;
+        }
+      }
+    }
+  }
+
+  if (!force_use_int8_compute_) {
+    for (auto in_var_node : op_node->inlinks) {
+      CHECK(in_var_node->IsArg());
+      auto in_var_name = in_var_node->arg()->name;
+      if (op_info->HasInputScale(in_var_name)) {
+        float input_scale = op_info->GetInputScale(in_var_name)[0];
+        if (abs(input_scale - cancat_out_scale) > 0.01f) {
+          *quant_int8 = false;
+          break;
         }
       }
     }
   }
 }
+
 // Only pick some ops for  int8 compute in XPU.
 // Op pick int8 kernel in XPU, when has enable_int8 attribute.
 void XPUStaticKernelPickPass::strategiesInt8OP(
@@ -1022,7 +1079,7 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
     return;
   }
 
-  // 2.
+  // 2.The next consumers OP must have attribute enable_int8.
   *quant_int8 = false;
   for (auto out_var_node : op_node->outlinks) {
     CHECK(out_var_node->IsArg());
@@ -1066,12 +1123,11 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
   }
 
   if (*quant_int8) {
-    VLOG(1) << "satisfied";
     return;
   }
 
-  // 3.If the relative threshold between the input maximum and output maximum of
-  // the current op is less than 10%.
+  // 3.The relative threshold between the input maximum and output maximum
+  // of the current op is less than 10%.
   *quant_int8 = true;
   float out_scale = 0.0f;
   if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
@@ -1084,13 +1140,10 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
     auto in_var_name = in_var_node->arg()->name;
-    VLOG(1) << "in_var_name:" << in_var_name;
     if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
       float input_scale =
           instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
-      VLOG(1) << "input_scale:" << input_scale;
-      VLOG(1) << "out_scale:" << out_scale;
-      if (abs((input_scale - out_scale) / out_scale) > 0.1) {
+      if ((abs(input_scale - out_scale) / out_scale) > 0.1f) {
         *quant_int8 = false;
         break;
       }
@@ -1099,12 +1152,10 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
     }
   }
   if (*quant_int8) {
-    VLOG(1) << "satisfied";
     return;
   }
 
   // 4.special op ew_add
-
   if (op_type == "elementwise_add") {
     out_scale = 0.0f;
     if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
@@ -1120,7 +1171,6 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
             instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
         if (abs((input_scale - out_scale) / out_scale) < 0.1f) {
           *quant_int8 = true;
-          VLOG(1) << "satisfied";
           return;
         }
       }
@@ -1145,7 +1195,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
     bool quant_int8 = true;
     // wing to slim bug,Temp add.
     // Decide the enable_int8 attribute of general int8 op is true or false.
-    if (!xpu_inplace_op_.count(op_type)) {
+    if (xpu_int8_general_op_.count(op_type)) {
       for (auto in_var_node : op_node->inlinks) {
         CHECK(in_var_node->IsArg());
         auto in_var_name = in_var_node->arg()->name;
@@ -1168,6 +1218,29 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       }
     }
 
+    // At least one producer's int8 attribute is true.
+    {
+      bool enable_int8 = false;
+      for (auto in_var_node : op_node->inlinks) {
+        CHECK(in_var_node->IsArg());
+        if (in_var_node->inlinks.empty()) continue;
+        for (auto iter_node = in_var_node->inlinks.begin();
+             iter_node != in_var_node->inlinks.end();
+             iter_node++) {
+          if (!(*iter_node)->IsStmt()) continue;
+          auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+          if (pre_op_info->HasAttr("enable_int8") &&
+              pre_op_info->GetAttr<bool>("enable_int8")) {
+            enable_int8 = true;
+            break;
+          }
+        }
+      }
+      if (!enable_int8) {
+        quant_int8 = false;
+      }
+    }
+
     if (!quant_int8) {
       instruct.mutable_op_info()->SetAttr<bool>("enable_int8", false);
       auto update_desc = *instruct.mutable_op_info();
@@ -1175,40 +1248,13 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       continue;
     }
 
-    strategiesInt8OP(op_node, instruct, &quant_int8);
+    if (!force_use_int8_compute_) {
+      strategiesInt8OP(op_node, instruct, &quant_int8);
+    }
 
     // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat" && quant_int8) {
-      for (auto out_var_node : op_node->outlinks) {
-        CHECK(out_var_node->IsArg());
-        auto out_var_name = out_var_node->arg()->name;
-        if (out_var_name == "concat_16.tmp_0" ||
-            out_var_name == "concat_14.tmp_0" ||
-            out_var_name == "concat_15.tmp_0") {
-          quant_int8 = false;
-          break;
-        }
-      }
-
-      strategiesconcatOP(op_node);
-      float out_scale = 0.0f;
-      if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
-        out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
-            "Out0_scale")[0];
-      }
-
-      for (auto in_var_node : op_node->inlinks) {
-        CHECK(in_var_node->IsArg());
-        auto in_var_name = in_var_node->arg()->name;
-        if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
-          float input_scale =
-              instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
-          if (abs(input_scale - out_scale) > 0.001f) {
-            quant_int8 = false;
-            break;
-          }
-        }
-      }
+      strategiesconcatOP(op_node, &quant_int8);
     }
 
     if (!quant_int8) {
@@ -1216,7 +1262,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
     } else {
       instruct.mutable_op_info()->SetAttr<bool>("enable_int8", true);
     }
-    VLOG(1) << "op_type:" << op_type << "quant_int8:" << quant_int8;
+    VLOG(4) << "op_type:" << op_type << "quant_int8:" << quant_int8;
     auto update_desc = *instruct.mutable_op_info();
     instruct.ResetOp(update_desc, graph->valid_places());
   }

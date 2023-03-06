@@ -82,6 +82,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
     if (encode_precision_.empty()) {
       encode_precision_ = GetStringFromEnv("XPU_ENCODER_PRECISION");
     }
+    force_use_int8_compute_ = GetBoolFromEnv("XPU_FORCE_USE_INT8", false);
 #endif
   }
 
@@ -302,7 +303,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   void strategiesInt8OP(lite::mir::Node* op_node,
                         paddle::lite::mir::Node::Stmt& instruct,
                         bool* quant_int8);
-  void strategiesconcatOP(lite::mir::Node* op_node);
+  void strategiesconcatOP(lite::mir::Node* op_node, bool* quant_int8);
   void SliceForceNotUseXPU(lite::mir::Node* node,
                            const lite::KernelBase& kernel,
                            bool* type_match,
@@ -344,15 +345,6 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
       "slice",
       "shape"};
 
-  const std::set<std::string> xpu_int8_general_op_need_sacale_{
-      "pool2d",
-      "elementwise_add",
-      "elementwise_mul",
-      "concat",
-      "reduce_mean",
-      "bilinear_interp",
-      "bilinear_interp_v2"};
-
   const std::set<std::string> xpu_int8_general_op_{"pool2d",
                                                    "elementwise_add",
                                                    "elementwise_mul",
@@ -363,7 +355,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                                                    "nearest_interp",
                                                    "nearest_interp_v2",
                                                    "transpose",
-                                                   //"transpose2",
+                                                   "transpose2",
                                                    "split",
                                                    "clip",
                                                    "slice",
@@ -372,6 +364,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   bool local_quant_{false};
   std::string encode_precision_;
   bool kernel_use_host_ = false;
+  bool force_use_int8_compute_{false};
 };
 
 }  // namespace mir
