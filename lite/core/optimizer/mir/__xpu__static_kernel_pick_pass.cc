@@ -929,6 +929,9 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
 
 void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
                                                  bool* quant_int8) {
+  if (!quant_int8) {
+    return;
+  }
   auto op_info = op_node->AsStmt().mutable_op_info();
   float cancat_out_scale = 0;
   std::string cancat_out_var_name;
@@ -999,7 +1002,8 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
       auto pre_op_type = (*iter_node)->AsStmt().mutable_op_info()->Type();
       // Reset pre-pre inlinks op output sclae value,if pre inlinks op is
       // inplace.
-      if (xpu_inplace_op_.count(pre_op_type)) {
+      if (xpu_inplace_op_.count(pre_op_type) ||
+          xpu_int8_general_op_not_need_sacale_.count(pre_op_type)) {
         auto inplace_input_var_node = (*iter_node)->inlinks.front();
         CHECK(inplace_input_var_node->IsArg());
         auto inplace_input_var_name = inplace_input_var_node->arg()->name;
