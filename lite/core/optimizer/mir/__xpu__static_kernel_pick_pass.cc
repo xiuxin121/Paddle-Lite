@@ -1254,6 +1254,14 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
 
     // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat" && quant_int8) {
+      for (auto out_var_node : op_node->outlinks) {
+        CHECK(out_var_node->IsArg());
+        auto out_var_name = out_var_node->arg()->name;
+        if (out_var_name == "concat_15.tmp_0") {
+          quant_int8 = false;
+          break;
+        }
+      }
       strategiesconcatOP(op_node, &quant_int8);
     }
 
