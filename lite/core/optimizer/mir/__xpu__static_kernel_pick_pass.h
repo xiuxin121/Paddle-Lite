@@ -267,7 +267,8 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   void InplaceNodeInputPrecision(lite::mir::Node* node);
   void SpecialNodeInputPrecision(lite::mir::Node* node,
                                  const bool collect_int8,
-                                 const bool collect_fp16);
+                                 const bool collect_fp16,
+                                 bool* has_collected);
 
   void NodeOutputPrecision(const std::unique_ptr<SSAGraph>& graph,
                            lite::mir::Node* node);

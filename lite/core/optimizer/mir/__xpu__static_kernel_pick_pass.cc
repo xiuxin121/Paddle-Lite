@@ -18,6 +18,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 #include "lite/core/optimizer/mir/graph_visualize_pass.h"
@@ -52,18 +53,23 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
   if (xpu_use_fp16_optimizer_ || xpu_use_int8_optimizer_) {
     CollectXPUSpecialOPType(graph);
     for (auto& node : graph->StmtTopologicalOrder()) {
+      bool has_collected = false;
       if (!node->IsStmt()) continue;
 
       if (xpu_use_fp16_optimizer_ &&
           xpu_special_op_.count(node->AsStmt().op_type())) {
-        SpecialNodeInputPrecision(node, false, xpu_use_fp16_optimizer_);
+        SpecialNodeInputPrecision(
+            node, false, xpu_use_fp16_optimizer_, &has_collected);
       }
 
       if (xpu_use_int8_optimizer_ &&
           (xpu_int8_special_op_.count(node->AsStmt().op_type()) ||
            xpu_int8_general_op_.count(node->AsStmt().op_type()))) {
-        SpecialNodeInputPrecision(node, xpu_use_int8_optimizer_, false);
-        continue;
+        SpecialNodeInputPrecision(
+            node, xpu_use_int8_optimizer_, false, &has_collected);
+        if (has_collected) {
+          continue;
+        }
       }
 
       if (xpu_inplace_op_.count(node->AsStmt().op_type())) {
@@ -382,8 +388,10 @@ void XPUStaticKernelPickPass::InplaceNodeOutputPrecision(
 
 // Special nodes like conv2d, matmul ; collect input data precision for eatch
 // registry kernel as a candidate set.
-void XPUStaticKernelPickPass::SpecialNodeInputPrecision(
-    lite::mir::Node* node, const bool collect_int8, const bool collect_fp16) {
+void XPUStaticKernelPickPass::SpecialNodeInputPrecision(lite::mir::Node* node,
+                                                        const bool collect_int8,
+                                                        const bool collect_fp16,
+                                                        bool* has_collected) {
   auto& inst = node->AsStmt();
   const auto* op_info = inst.op_info();
   if (collect_int8) {
@@ -437,6 +445,7 @@ void XPUStaticKernelPickPass::SpecialNodeInputPrecision(
 
     xpu_input_type_.emplace(var_name, kernel_input_type);
   }
+  *has_collected = true;
 }
 
 void XPUStaticKernelPickPass::NodeInputPrecision(
@@ -462,6 +471,7 @@ void XPUStaticKernelPickPass::NodeInputPrecision(
     Scope* scope = node->AsStmt().op()->scope();
 
     auto* var_ptr = scope->FindVar(var_name);
+    VLOG(6) << "typeid:" << typeid(*var_ptr).name();
     if (var_ptr == nullptr) {
       VLOG(6) << "Can't find input var_name:  " << var_name
               << "in current scope.";
@@ -475,6 +485,8 @@ void XPUStaticKernelPickPass::NodeInputPrecision(
     precison = var_ptr->GetMutable<lite::Tensor>()->precision();
     tmp_map.emplace(inst.op_type(), precison);
     kernel_input_type.emplace_back(std::move(tmp_map));
+    VLOG(6) << "var name:" << var_name << "inst.op_type():" << inst.op_type()
+            << static_cast<int>(precison);
     xpu_input_type_.emplace(var_name, kernel_input_type);
   }
 }
