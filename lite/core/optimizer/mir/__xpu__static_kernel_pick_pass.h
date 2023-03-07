@@ -82,7 +82,8 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
     if (encode_precision_.empty()) {
       encode_precision_ = GetStringFromEnv("XPU_ENCODER_PRECISION");
     }
-    force_use_int8_compute_ = GetBoolFromEnv("XPU_FORCE_USE_INT8", false);
+    xpu_int8_compute_autotune_ = GetBoolFromEnv("XPU_INT8_AUTOTUNE", false);
+    xpu_full_quantization_ = GetBoolFromEnv("XPU_FULL_QUANTIZATION", true);
 #endif
   }
 
@@ -364,7 +365,8 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   bool local_quant_{false};
   std::string encode_precision_;
   bool kernel_use_host_ = false;
-  bool force_use_int8_compute_{false};
+  bool xpu_int8_compute_autotune_{false};
+  bool xpu_full_quantization_{true};
 };
 
 }  // namespace mir

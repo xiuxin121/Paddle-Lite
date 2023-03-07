@@ -45,7 +45,7 @@ void XPUStaticKernelPickPass::Apply(const std::unique_ptr<SSAGraph>& graph) {
   // Collect input data precision for each node in the graph
   // Collect XPU op type,which used in fp16/in8;
   DataPrecisionDicide(graph);
-  if (xpu_use_int8_optimizer_) {
+  if (xpu_use_int8_optimizer_ && xpu_full_quantization_) {
     SetEnableInt8Attribute(graph);
   }
 
@@ -949,7 +949,26 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
     return;
   }
 
-  // case1.Producer of concat has more than one output.
+  // case1.consumer of concat is those op,which is not nedd scale,so concat outs
+  // scale value is Untrustworthy.
+  if (xpu_int8_compute_autotune_) {
+    for (auto out_var_node : op_node->outlinks) {
+      CHECK(out_var_node->IsArg());
+      if (out_var_node->outlinks.empty()) continue;
+      for (auto iter_node = out_var_node->outlinks.begin();
+           iter_node != out_var_node->outlinks.end();
+           iter_node++) {
+        if (!(*iter_node)->IsStmt()) continue;
+        auto next_op_type = (*iter_node)->AsStmt().mutable_op_info()->Type();
+        if (xpu_int8_general_op_not_need_sacale_.count(next_op_type)) {
+          *quant_int8 = false;
+          return;
+        }
+      }
+    }
+  }
+
+  // case2.Producer of concat has more than one output.
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
     auto concat_in_var_name = in_var_node->arg()->name;
@@ -1052,7 +1071,7 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
     }
   }
 
-  if (!force_use_int8_compute_) {
+  if (xpu_int8_compute_autotune_) {
     for (auto in_var_node : op_node->inlinks) {
       CHECK(in_var_node->IsArg());
       auto in_var_name = in_var_node->arg()->name;
@@ -1252,20 +1271,12 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       continue;
     }
 
-    if (!force_use_int8_compute_) {
+    if (xpu_int8_compute_autotune_) {
       strategiesInt8OP(op_node, instruct, &quant_int8);
     }
 
     // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat" && quant_int8) {
-      for (auto out_var_node : op_node->outlinks) {
-        CHECK(out_var_node->IsArg());
-        auto out_var_name = out_var_node->arg()->name;
-        if (out_var_name == "concat_15.tmp_0") {
-          quant_int8 = false;
-          break;
-        }
-      }
       strategiesconcatOP(op_node, &quant_int8);
     }
 
