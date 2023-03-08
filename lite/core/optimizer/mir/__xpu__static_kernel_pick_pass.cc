@@ -17,8 +17,8 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <queue>
 #include <string>
-#include <typeinfo>
 #include <utility>
 #include <vector>
 #include "lite/core/optimizer/mir/graph_visualize_pass.h"
@@ -471,7 +471,6 @@ void XPUStaticKernelPickPass::NodeInputPrecision(
     Scope* scope = node->AsStmt().op()->scope();
 
     auto* var_ptr = scope->FindVar(var_name);
-    VLOG(6) << "typeid:" << typeid(*var_ptr).name();
     if (var_ptr == nullptr) {
       VLOG(6) << "Can't find input var_name:  " << var_name
               << "in current scope.";
@@ -1281,6 +1280,52 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
       auto update_desc = *instruct.mutable_op_info();
       instruct.ResetOp(update_desc, graph->valid_places());
       continue;
+    }
+
+    // hard code
+    {
+      quant_int8 = false;
+      std::queue<lite::mir::Node*> next_ops{};
+      next_ops.push(op_node);
+      int num = 0;
+      lite::mir::Node* cur_node;
+      while (num < 5) {
+        if (next_ops.size() > 0) {
+          cur_node = next_ops.front();
+          next_ops.pop();
+        }
+
+        for (auto out_var_node : cur_node->outlinks) {
+          CHECK(out_var_node->IsArg());
+          if (out_var_node->outlinks.empty()) continue;
+          for (auto iter_node = out_var_node->outlinks.begin();
+               iter_node != out_var_node->outlinks.end();
+               iter_node++) {
+            if (!(*iter_node)->IsStmt()) continue;
+            auto op_type = (*iter_node)->AsStmt().mutable_op_info()->Type();
+            if (xpu_int8_special_op_.count(op_type)) {
+              quant_int8 = true;
+              break;
+            }
+            next_ops.push((*iter_node));
+          }
+        }
+        if (quant_int8) {
+          break;
+        }
+        if (xpu_inplace_op_.count(
+                cur_node->AsStmt().mutable_op_info()->Type())) {
+          continue;
+        }
+        num++;
+      }
+
+      if (!quant_int8) {
+        instruct.mutable_op_info()->SetAttr<bool>("enable_int8", false);
+        auto update_desc = *instruct.mutable_op_info();
+        instruct.ResetOp(update_desc, graph->valid_places());
+        continue;
+      }
     }
 
     if (xpu_int8_compute_autotune_) {
