@@ -5,7 +5,7 @@ readonly CMAKE_COMMON_OPTIONS="-DWITH_MKL=OFF \
                                -DLITE_WITH_X86=OFF \
                                -DLITE_WITH_ARM=ON"
 
-readonly NUM_PROC=${LITE_BUILD_THREADS:-8}
+readonly NUM_PROC=${LITE_BUILD_THREADS:-32}
 
 # global variables
 CMAKE_EXTRA_OPTIONS=""

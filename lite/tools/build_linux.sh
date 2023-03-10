@@ -96,7 +96,7 @@ WITH_PRECISION_PROFILE=OFF
 # option of benchmark, default is OFF
 WITH_BENCHMARK=OFF
 # num of threads used during compiling..
-readonly NUM_PROC=${LITE_BUILD_THREADS:-4}
+readonly NUM_PROC=${LITE_BUILD_THREADS:-32}
 #####################################################################################################
 
 
