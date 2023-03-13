@@ -84,6 +84,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
     }
     xpu_int8_compute_autotune_ = GetBoolFromEnv("XPU_INT8_AUTOTUNE", false);
     xpu_full_quantization_ = GetBoolFromEnv("XPU_FULL_QUANTIZATION", true);
+    fetch_tensor_in_xpu_ = GetBoolFromEnv("FETCH_TENSOR_IN_XPU", false);
 #endif
   }
 
@@ -127,6 +128,12 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
             kMax /
             static_cast<int>(core::KernelPickFactor::Factor::TargetFirst);
         score += target_score;
+        if (instruct.op_info()->Type() == "fetch" &&
+            kernel.target() == TARGET(kXPU) && !fetch_tensor_in_xpu_) {
+          score = 0;
+          VLOG(4)
+              << "By default, the output tensor of fetch op is not on the xpu";
+        }
         VLOG(4) << "[TargetConsidered score]:" << target_score;
       }
       VLOG(4) << "[score s1]:" << score;
@@ -368,6 +375,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   bool kernel_use_host_ = false;
   bool xpu_int8_compute_autotune_{false};
   bool xpu_full_quantization_{true};
+  bool fetch_tensor_in_xpu_{false};
 };
 
 }  // namespace mir

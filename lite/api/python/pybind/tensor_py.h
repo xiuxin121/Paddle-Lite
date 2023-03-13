@@ -24,10 +24,10 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "assert.h"
 #include "lite/api/paddle_api.h"
 #include "lite/api/python/pybind/pybind.h"
 #include "lite/core/tensor.h"
-
 namespace py = pybind11;
 
 namespace paddle {
@@ -92,8 +92,20 @@ inline py::array TensorToPyArray(const Tensor &tensor,
   if (!tensor.IsInitialized()) {
     return py::array(py::dtype(py_dtype_str.c_str()), py_dims);
   }
+  const void *tensor_buf_ptr = nullptr;
+  if (TargetType::kXPU == tensor.target()) {
+    std::vector<int8_t> tensor_host(sizeof_dtype * numel, 0);
+    xpu_wait();
+    xpu_memcpy((void *)tensor_host.data(),
+               (char *)tensor.data<int8_t>(),
+               sizeof_dtype * numel,
+               XPU_DEVICE_TO_HOST);
+    xpu_wait();
+    tensor_buf_ptr = static_cast<const void *>(tensor_host.data());
+  } else {
+    tensor_buf_ptr = static_cast<const void *>(tensor.data<int8_t>());
+  }
 
-  const void *tensor_buf_ptr = static_cast<const void *>(tensor.data<int8_t>());
   auto base = py::cast(std::move(tensor));
   return py::array(py::dtype(py_dtype_str.c_str()),
                    py_dims,
@@ -119,7 +131,13 @@ void SetTensorFromPyArrayT(
   self->Resize(dims);
 
   auto dst = self->mutable_data<T>(place);
-  std::memcpy(dst, array.data(), array.nbytes());
+  if (TargetType::kXPU == place) {
+    xpu_wait();
+    xpu_memcpy(dst, array.data(), array.nbytes(), XPU_HOST_TO_DEVICE);
+    xpu_wait();
+  } else {
+    std::memcpy(dst, array.data(), array.nbytes());
+  }
 }
 
 ////////////////////////////////////////////////////////////////
