@@ -938,8 +938,10 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
   return;
 }
 
-void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
-                                                 bool* quant_int8) {
+void XPUStaticKernelPickPass::strategiesconcatOP(
+    const std::unique_ptr<SSAGraph>& graph,
+    lite::mir::Node* op_node,
+    bool* quant_int8) {
   if (!quant_int8) {
     return;
   }
@@ -1019,6 +1021,10 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
     op_info->SetInputScale(in_var_name, {cancat_out_scale});
   }
 
+  auto& cur_instruct = op_node->AsStmt();
+  auto cur_update_desc = *cur_instruct.mutable_op_info();
+  cur_instruct.ResetOp(cur_update_desc, graph->valid_places());
+
   // Reset the out scale ，which the producers of concat.
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
@@ -1043,6 +1049,8 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
         }
 
         auto pre_pre_op_info = pre_pre_node->AsStmt().mutable_op_info();
+        auto& pre_pre_instruct = pre_pre_node->AsStmt();
+
         for (auto pre_pre_op_out_var_node : pre_pre_node->outlinks) {
           CHECK(pre_pre_op_out_var_node->IsArg());
           auto var_name = pre_pre_op_out_var_node->arg()->name;
@@ -1059,10 +1067,15 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
             break;
           }
         }
+
+        auto pre_pre_update_desc = *pre_pre_instruct.mutable_op_info();
+        pre_pre_instruct.ResetOp(pre_pre_update_desc, graph->valid_places());
       }
 
       // Reset pre inlinks op output sclae value
       auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+      auto& pre_instruct = (*iter_node)->AsStmt();
+
       for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
         CHECK(preinlik_op_out_var_node->IsArg());
         auto out_var_name = preinlik_op_out_var_node->arg()->name;
@@ -1079,6 +1092,8 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
           break;
         }
       }
+      auto pre_update_desc = *pre_instruct.mutable_op_info();
+      pre_instruct.ResetOp(pre_update_desc, graph->valid_places());
     }
   }
 
@@ -1334,7 +1349,7 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
 
     // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat" && quant_int8) {
-      strategiesconcatOP(op_node, &quant_int8);
+      strategiesconcatOP(graph, op_node, &quant_int8);
     }
 
     if (!quant_int8) {

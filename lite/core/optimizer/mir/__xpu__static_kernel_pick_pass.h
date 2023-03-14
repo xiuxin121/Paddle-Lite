@@ -312,7 +312,9 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   void strategiesInt8OP(lite::mir::Node* op_node,
                         paddle::lite::mir::Node::Stmt& instruct,
                         bool* quant_int8);
-  void strategiesconcatOP(lite::mir::Node* op_node, bool* quant_int8);
+  void strategiesconcatOP(const std::unique_ptr<SSAGraph>& graph,
+                          lite::mir::Node* op_node,
+                          bool* quant_int8);
   void SliceForceNotUseXPU(lite::mir::Node* node,
                            const lite::KernelBase& kernel,
                            bool* type_match,
