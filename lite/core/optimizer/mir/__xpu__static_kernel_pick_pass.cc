@@ -938,8 +938,10 @@ void XPUStaticKernelPickPass::CollectXPUSpecialOPType(
   return;
 }
 
-void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
-                                                 bool* quant_int8) {
+void XPUStaticKernelPickPass::strategiesconcatOP(
+    const std::unique_ptr<SSAGraph>& graph,
+    lite::mir::Node* op_node,
+    bool* quant_int8) {
   if (!quant_int8) {
     return;
   }
@@ -1019,6 +1021,10 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
     op_info->SetInputScale(in_var_name, {cancat_out_scale});
   }
 
+  auto& cur_instruct = op_node->AsStmt();
+  auto cur_update_desc = *cur_instruct.mutable_op_info();
+  cur_instruct.ResetOp(cur_update_desc, graph->valid_places());
+
   // Reset the out scale ，which the producers of concat.
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
@@ -1043,6 +1049,8 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
         }
 
         auto pre_pre_op_info = pre_pre_node->AsStmt().mutable_op_info();
+        auto& pre_pre_instruct = pre_pre_node->AsStmt();
+
         for (auto pre_pre_op_out_var_node : pre_pre_node->outlinks) {
           CHECK(pre_pre_op_out_var_node->IsArg());
           auto var_name = pre_pre_op_out_var_node->arg()->name;
@@ -1059,10 +1067,15 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
             break;
           }
         }
+
+        auto pre_pre_update_desc = *pre_pre_instruct.mutable_op_info();
+        pre_pre_instruct.ResetOp(pre_pre_update_desc, graph->valid_places());
       }
 
       // Reset pre inlinks op output sclae value
       auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
+      auto& pre_instruct = (*iter_node)->AsStmt();
+
       for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
         CHECK(preinlik_op_out_var_node->IsArg());
         auto out_var_name = preinlik_op_out_var_node->arg()->name;
@@ -1079,6 +1092,8 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
           break;
         }
       }
+      auto pre_update_desc = *pre_instruct.mutable_op_info();
+      pre_instruct.ResetOp(pre_update_desc, graph->valid_places());
     }
   }
 
@@ -1099,11 +1114,10 @@ void XPUStaticKernelPickPass::strategiesconcatOP(lite::mir::Node* op_node,
 
 // Only pick some ops for  int8 compute in XPU.
 // Op pick int8 kernel in XPU, when has enable_int8 attribute.
-void XPUStaticKernelPickPass::strategiesInt8OP(
-    lite::mir::Node* op_node,
-    const paddle::lite::mir::Node::Stmt& instruct,
-    bool* quant_int8) {
-  auto op_type = instruct.op_info()->Type();
+void XPUStaticKernelPickPass::strategiesInt8OP(lite::mir::Node* op_node,
+                                               bool* quant_int8) {
+  auto& instruct = op_node->AsStmt();
+  auto op_type = instruct.mutable_op_info()->Type();
   // Use some strategies to evaluate whether the current OP can use int8
   // compute.
 
@@ -1164,9 +1178,9 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
   // of the current op is less than 10%.
   *quant_int8 = true;
   float out_scale = 0.0f;
-  if (instruct.op_info()->HasAttr("Out0_scale")) {
-    out_scale =
-        instruct.op_info()->GetAttr<std::vector<float>>("Out0_scale")[0];
+  if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
+    out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
+        "Out0_scale")[0];
   } else {
     *quant_int8 = false;
   }
@@ -1174,8 +1188,9 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
   for (auto in_var_node : op_node->inlinks) {
     CHECK(in_var_node->IsArg());
     auto in_var_name = in_var_node->arg()->name;
-    if (instruct.op_info()->HasInputScale(in_var_name)) {
-      float input_scale = instruct.op_info()->GetInputScale(in_var_name)[0];
+    if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
+      float input_scale =
+          instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
       if ((abs(input_scale - out_scale) / out_scale) > 0.1f) {
         *quant_int8 = false;
         break;
@@ -1191,16 +1206,17 @@ void XPUStaticKernelPickPass::strategiesInt8OP(
   // 4.special op ew_add
   if (op_type == "elementwise_add") {
     out_scale = 0.0f;
-    if (instruct.op_info()->HasAttr("Out0_scale")) {
-      out_scale =
-          instruct.op_info()->GetAttr<std::vector<float>>("Out0_scale")[0];
+    if (instruct.mutable_op_info()->HasAttr("Out0_scale")) {
+      out_scale = instruct.mutable_op_info()->GetAttr<std::vector<float>>(
+          "Out0_scale")[0];
     }
 
     for (auto in_var_node : op_node->inlinks) {
       CHECK(in_var_node->IsArg());
       auto in_var_name = in_var_node->arg()->name;
-      if (instruct.op_info()->HasInputScale(in_var_name)) {
-        float input_scale = instruct.op_info()->GetInputScale(in_var_name)[0];
+      if (instruct.mutable_op_info()->HasInputScale(in_var_name)) {
+        float input_scale =
+            instruct.mutable_op_info()->GetInputScale(in_var_name)[0];
         if (abs((input_scale - out_scale) / out_scale) < 0.1f) {
           *quant_int8 = true;
           return;
@@ -1327,12 +1343,12 @@ void XPUStaticKernelPickPass::SetEnableInt8Attribute(
     }
 
     if (xpu_int8_compute_autotune_) {
-      strategiesInt8OP(op_node, instruct, &quant_int8);
+      strategiesInt8OP(op_node, &quant_int8);
     }
 
     // when quant op is concat,the input and output values must be the same.
     if (op_type == "concat" && quant_int8) {
-      strategiesconcatOP(op_node, &quant_int8);
+      strategiesconcatOP(graph, op_node, &quant_int8);
     }
 
     if (!quant_int8) {

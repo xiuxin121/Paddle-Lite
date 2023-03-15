@@ -109,7 +109,6 @@ class KernelBase {
 #endif
 
     Run();
-
 #ifdef LITE_WITH_PROFILE
 #ifdef LITE_WITH_XPU
     void* xpu_stream = TargetWrapperXPU::get_xpu_stream();

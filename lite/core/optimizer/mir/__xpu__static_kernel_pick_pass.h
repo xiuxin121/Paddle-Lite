@@ -54,7 +54,6 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
  private:
   void Init() {
 #ifdef LITE_WITH_XPU
-    // clear kernel pick info to avoid crash when init two models respectively
     xpu_input_type_.clear();
     xpu_output_type_.clear();
     xpu_special_op_.clear();
@@ -90,6 +89,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
     }
     xpu_int8_compute_autotune_ = GetBoolFromEnv("XPU_INT8_AUTOTUNE", false);
     xpu_full_quantization_ = GetBoolFromEnv("XPU_FULL_QUANTIZATION", true);
+    fetch_tensor_in_xpu_ = GetBoolFromEnv("FETCH_TENSOR_IN_XPU", false);
 #endif
   }
 
@@ -133,6 +133,12 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
             kMax /
             static_cast<int>(core::KernelPickFactor::Factor::TargetFirst);
         score += target_score;
+        if (instruct.op_info()->Type() == "fetch" &&
+            kernel.target() == TARGET(kXPU) && !fetch_tensor_in_xpu_) {
+          score = 0;
+          VLOG(4)
+              << "By default, the output tensor of fetch op is not on the xpu";
+        }
         VLOG(4) << "[TargetConsidered score]:" << target_score;
       }
       VLOG(4) << "[score s1]:" << score;
@@ -308,10 +314,10 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
                           bool* type_match,
                           size_t* score);
   void SetEnableInt8Attribute(const std::unique_ptr<SSAGraph>& graph);
-  void strategiesInt8OP(lite::mir::Node* op_node,
-                        const paddle::lite::mir::Node::Stmt& instruct,
-                        bool* quant_int8);
-  void strategiesconcatOP(lite::mir::Node* op_node, bool* quant_int8);
+  void strategiesInt8OP(lite::mir::Node* op_node, bool* quant_int8);
+  void strategiesconcatOP(const std::unique_ptr<SSAGraph>& graph,
+                          lite::mir::Node* op_node,
+                          bool* quant_int8);
   void SliceForceNotUseXPU(lite::mir::Node* node,
                            const lite::KernelBase& kernel,
                            bool* type_match,
@@ -374,6 +380,7 @@ class XPUStaticKernelPickPass : public mir::StmtPass {
   bool kernel_use_host_ = false;
   bool xpu_int8_compute_autotune_{false};
   bool xpu_full_quantization_{true};
+  bool fetch_tensor_in_xpu_{false};
 };
 
 }  // namespace mir

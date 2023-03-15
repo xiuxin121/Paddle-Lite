@@ -367,96 +367,6 @@ void XPUQuantizationParametersPropagationPass::ResetScale(
   }
 }
 
-void XPUQuantizationParametersPropagationPass::ResetConcatInlinkOPScale(
-    const std::unique_ptr<SSAGraph>& graph) {
-  for (auto& op_node : graph->StmtTopologicalOrder()) {
-    if (!op_node->IsStmt()) continue;
-    auto op_info = op_node->AsStmt().mutable_op_info();
-    auto op_type = op_info->Type();
-    if (op_type != "concat") {
-      continue;
-    }
-
-    bool enbale_int8 = true;
-    // if concat producer has more than one output,concat op not use int8
-    // pricision.
-    for (auto in_var_node : op_node->inlinks) {
-      CHECK(in_var_node->IsArg());
-      auto in_var_name = in_var_node->arg()->name;
-
-      if (in_var_node->inlinks.empty()) continue;
-      for (auto iter_node = in_var_node->inlinks.begin();
-           iter_node != in_var_node->inlinks.end();
-           iter_node++) {
-        if (!(*iter_node)->IsStmt()) continue;
-
-        for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
-          CHECK(preinlik_op_out_var_node->IsArg());
-          if (preinlik_op_out_var_node->outlinks.size() > 1) {
-            enbale_int8 = false;
-          }
-        }
-      }
-    }
-
-    if (!enbale_int8) {
-      continue;
-    }
-
-    float out_var_scale = 0;
-    for (auto out_var_node : op_node->outlinks) {
-      CHECK(out_var_node->IsArg());
-      auto out_var_name = out_var_node->arg()->name;
-      if (op_info->HasOutputScale(out_var_name)) {
-        out_var_scale = op_info->GetOutputScale(out_var_name)[0];
-        break;
-      }
-    }
-
-    // Reset intput sclae value
-    if (out_var_scale > 0) {
-      // Reset intput sclae values
-      for (auto in_var_node : op_node->inlinks) {
-        CHECK(in_var_node->IsArg());
-        auto in_var_name = in_var_node->arg()->name;
-        if (!op_info->HasInputScale(in_var_name)) continue;
-        op_info->SetInputScale(in_var_name, {out_var_scale});
-      }
-
-      // Reset pre inlinks op output sclae value
-      for (auto in_var_node : op_node->inlinks) {
-        CHECK(in_var_node->IsArg());
-        auto in_var_name = in_var_node->arg()->name;
-
-        if (in_var_node->inlinks.empty()) continue;
-        for (auto iter_node = in_var_node->inlinks.begin();
-             iter_node != in_var_node->inlinks.end();
-             iter_node++) {
-          if (!(*iter_node)->IsStmt()) continue;
-          auto pre_op_info = (*iter_node)->AsStmt().mutable_op_info();
-
-          for (auto preinlik_op_out_var_node : (*iter_node)->outlinks) {
-            CHECK(preinlik_op_out_var_node->IsArg());
-            auto out_var_name = preinlik_op_out_var_node->arg()->name;
-            if (in_var_name != out_var_name) {
-              continue;
-            }
-
-            if (pre_op_info->HasOutputScale(out_var_name)) {
-              pre_op_info->SetOutputScale(out_var_name, {out_var_scale});
-              VLOG(4) << "OP type : " << pre_op_info->Type()
-                      << ", origin out sacle is:"
-                      << pre_op_info->GetOutputScale(out_var_name)[0]
-                      << ", Reset out scale is :" << out_var_scale;
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
 void XPUQuantizationParametersPropagationPass::Apply(
     const std::unique_ptr<SSAGraph>& graph) {
   VLOG(5) << "\n" << Visualize(graph.get());
@@ -490,9 +400,6 @@ void XPUQuantizationParametersPropagationPass::Apply(
 
   // (e) Reset all scale(* 127) in xpu op.
   ResetScale(graph);
-
-  // (f) Reset output scale of concat consumer ops.
-  // ResetConcatInlinkOPScale(graph);
 
   // (g) Complete the output scale according to the input scale, or
   // complete

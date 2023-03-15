@@ -107,8 +107,8 @@ void Optimizer::ApplyPasses(
     }
 
     if (pass->name() == "__xpu__squeeze_excitation_fuse_pass" && int8_model_) {
-      continue;
       LOG(INFO) << "XPU int8 model Skip " << pass->name();
+      continue;
     }
 
     bool matched =

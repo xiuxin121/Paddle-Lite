@@ -68,10 +68,8 @@ struct AddFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -85,13 +83,17 @@ struct AddFunctor<int8_t> {
                         const int8_t* x,
                         const int8_t* y,
                         int8_t* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
+    CHECK_EQ(xshape.size(), yshape.size());
+    int64_t len = 1;
+    for (size_t i = 0; i < xshape.size(); i++) {
+      CHECK_EQ(xshape[i], yshape[i]);
+      len *= xshape[i];
+    }
     return xdnn::add_activation_fusion<int8_t>(
         ctx,
         x,
@@ -111,10 +113,8 @@ struct SubFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -128,10 +128,8 @@ struct MulFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -145,10 +143,8 @@ struct MulFunctor<int8_t> {
                         const int8_t* x,
                         const int8_t* y,
                         int8_t* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -157,7 +153,8 @@ struct MulFunctor<int8_t> {
         x,
         y,
         z,
-        len,
+        xshape,
+        yshape,
         max_x,
         max_y,
         max_z,
@@ -171,10 +168,8 @@ struct DivFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -188,10 +183,8 @@ struct MaxFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -205,10 +198,8 @@ struct MinFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -222,10 +213,8 @@ struct ModFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -239,10 +228,8 @@ struct FloordivFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -256,10 +243,8 @@ struct PowFunctor {
                         const T* x,
                         const T* y,
                         T* z,
-                        const std::vector<int>& xshape,
-                        const std::vector<int>& yshape,
-                        bool enable_int8,
-                        int64_t len,
+                        const std::vector<int64_t>& xshape,
+                        const std::vector<int64_t>& yshape,
                         const float* max_x,
                         const float* max_y,
                         float* max_z) const {
@@ -268,18 +253,18 @@ struct PowFunctor {
 };
 
 void set_shape(int axis,
-               std::vector<int>* larger_shape,
-               std::vector<int>* smaller_shape,
+               std::vector<int64_t>* larger_shape,
+               std::vector<int64_t>* smaller_shape,
                const DDimLite& larger_dim,
                const DDimLite& smaller_dim) {
   const int axis_tmp =
-      (axis == -1 ? static_cast<int>(larger_dim.size() - smaller_dim.size())
+      (axis == -1 ? static_cast<int64_t>(larger_dim.size() - smaller_dim.size())
                   : axis);
   for (size_t i = 0; i < larger_dim.size(); i++) {
-    (*larger_shape)[i] = static_cast<int>(larger_dim[i]);
+    (*larger_shape)[i] = static_cast<int64_t>(larger_dim[i]);
   }
   for (size_t i = 0; i < smaller_dim.size(); ++i) {
-    (*smaller_shape)[i + axis_tmp] = static_cast<int>(smaller_dim[i]);
+    (*smaller_shape)[i + axis_tmp] = static_cast<int64_t>(smaller_dim[i]);
     CHECK_EQ(((*larger_shape)[i + axis_tmp] == (*smaller_shape)[i + axis_tmp] ||
               (*larger_shape)[i + axis_tmp] == 1 ||
               (*smaller_shape)[i + axis_tmp] == 1),
@@ -296,17 +281,16 @@ void ElementwiseCompute<T, Functor, PType>::Run() {
   auto& x_dim = x->dims();
   auto& y_dim = y->dims();
 
-  std::vector<int> x_shape(param.Out->dims().size(), 1);
-  std::vector<int> y_shape(param.Out->dims().size(), 1);
-  int64_t len = 1;
+  std::vector<int64_t> x_shape(param.Out->dims().size(), 1);
+  std::vector<int64_t> y_shape(param.Out->dims().size(), 1);
   float* quant_x_max = nullptr;
   float* quant_y_max = nullptr;
   float* quant_z_max = nullptr;
 
   if (x_dim.size() == y_dim.size()) {
     for (size_t i = 0; i < x_dim.size(); i++) {
-      x_shape[i] = static_cast<int>(x_dim[i]);
-      y_shape[i] = static_cast<int>(y_dim[i]);
+      x_shape[i] = static_cast<int64_t>(x_dim[i]);
+      y_shape[i] = static_cast<int64_t>(y_dim[i]);
       CHECK_EQ((x_shape[i] == y_shape[i] || x_shape[i] == 1 || y_shape[i] == 1),
                true);
     }
@@ -320,10 +304,6 @@ void ElementwiseCompute<T, Functor, PType>::Run() {
     quant_x_max = reinterpret_cast<float*>(quant_x_max_value_guard_->addr_);
     quant_y_max = reinterpret_cast<float*>(quant_y_max_value_guard_->addr_);
     quant_z_max = reinterpret_cast<float*>(quant_z_max_value_guard_->addr_);
-    CHECK_EQ(x_dim.size(), y_dim.size());
-    for (size_t i = 0; i < x_dim.size(); i++) {
-      len *= std::max(x_shape[i], y_shape[i]);
-    }
   }
 
   Functor elt_func;
@@ -333,8 +313,6 @@ void ElementwiseCompute<T, Functor, PType>::Run() {
                      param.Out->template mutable_data<T>(TARGET(kXPU)),
                      x_shape,
                      y_shape,
-                     param.enable_int8,
-                     len,
                      quant_x_max,
                      quant_y_max,
                      quant_z_max);

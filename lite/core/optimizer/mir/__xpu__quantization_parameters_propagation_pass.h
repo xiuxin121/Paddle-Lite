@@ -25,7 +25,6 @@ class XPUQuantizationParametersPropagationPass : public mir::StmtPass {
  public:
   void Apply(const std::unique_ptr<SSAGraph>& graph) override;
   void ResetScale(const std::unique_ptr<SSAGraph>& graph);
-  void ResetConcatInlinkOPScale(const std::unique_ptr<SSAGraph>& graph);
 };
 
 }  // namespace mir
